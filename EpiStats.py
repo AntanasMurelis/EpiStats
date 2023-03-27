@@ -7,7 +7,7 @@ from misc import get_label_vol_distribution, remove_unconnected_regions_of_label
 from skimage.morphology import binary_erosion
 from skimage.segmentation import expand_labels
 
-def obtain_statistics(labels, voxel_resolution = [0.236e-6, 0.236e-6, 0.487e-6], min_label_vol = 100000):
+def obtain_statistics(labels, voxel_resolution = [0.236e-6, 0.236e-6, 0.487e-6], min_label_vol = 10000):
     """Obtains statistics of the cells in the label image.
 
     Args:
@@ -32,37 +32,44 @@ def obtain_statistics(labels, voxel_resolution = [0.236e-6, 0.236e-6, 0.487e-6],
     label_to_remove_lst = label_to_remove_df["label_id"].to_list()
     labels[np.isin(labels, label_to_remove_lst)] = 0
     
-    # print("Removing unconnected regions...")
-    # #Remove the unconnected regions of the labels
-    # labels = remove_unconnected_regions_of_labels(labels)
+    print("Removing unconnected regions...")
+    #Remove the unconnected regions of the labels
+    labels = remove_unconnected_regions_of_labels(labels)
 
-    #Erode the labels of the cells in the image. 
+    # Erode the labels of the cells in the image. 
     print("Smoothing labels...")
     labels = perform_cell_label_erosion(labels, nb_iterations = 1)
     
-    #Expand the labels to make sure that the cell surfaces are touching
+    # #Expand the labels to make sure that the cell surfaces are touching
     labels = expand_labels(labels, distance=2)
 
-    print("Saving cell surface meshes...")
+    # print("Saving cell surface meshes...")
     #Generate the surface meshes
     cell_meshes = generate_cell_surface_meshes(labels, voxel_resolution)
-    
+
     #######################################
-    
+    id = np.unique(labels)[1:]
     cell_statistics = {}
     
     ######### Elementary Statistics ########
     
-    statistics = cle.statistics_of_labelled_pixels(None, labels)
-    cell_statistics['Volume'] = statistics['area']
+    regionprops = skimage.measure.regionprops(labels)
+    elongation = []
+    volume = []
+    
+    for i in range(np.size(id)):
+        elongation.append(
+            regionprops[i].axis_major_length/regionprops[i].axis_minor_length)
+        volume.append(regionprops[i].area)
+        
+    cell_statistics['Elongation'] = elongation
+    cell_statistics['Volume'] = volume * voxel_resolution[0] * voxel_resolution[1] * voxel_resolution[2]
     
     ########################################
-    
-    id = np.unique(labels)[1:]
+
     # Surface Area - Based on meshing - use Steve's implementation...
     s_area = []
     for _ in tqdm(id):
-        
         area = skimage.measure.mesh_surface_area(cell_meshes[_].vertices, cell_meshes[_].faces)
         s_area.append(area)
     cell_statistics['Surface area'] = s_area
@@ -79,28 +86,22 @@ def obtain_statistics(labels, voxel_resolution = [0.236e-6, 0.236e-6, 0.487e-6],
     cell_statistics['Compactness'] = (np.power(cell_statistics['Volume'], 2)) /(np.power(cell_statistics['Surface area'], 3))
     cell_statistics['Sphericity'] = np.power(cell_statistics['Compactness'], 1/3)
     
-    
-    # TODO: Elongation, Flatness, Sparsness
-    regionprops = skimage.measure.regionprops(labels)
-    elongation = []
-    for i in range(np.size(id)):
-        elongation.append(
-            regionprops[i].axis_major_length/regionprops[i].axis_minor_length)
-    cell_statistics['Elongation'] = elongation
-    
-    # Neighbours:
-    touch_matrix = cle.generate_touch_matrix(labels)
-    neighbours_arr = np.asarray(touch_matrix).sum(axis=1)[1:]
-    cell_statistics['Neighbours'] = neighbours_arr
+    # Neighbouring cells
+    touch_matrix = np.array(cle.generate_touch_matrix(labels))
+    touch_array = np.array([touch_matrix[i][1:].sum() for i in id])
+    cell_statistics['Neighbours'] = touch_array
     
     # Portion of total surface in contact:
     
     touch_count_matrix = cle.generate_touch_count_matrix(labels)
-    neighbour_touch = touch_count_matrix[1:, 1:].sum(axis=1)[0]
-    touch_portion = np.asarray(neighbour_touch) / cell_statistics['Volume']
+    
+    touch_count_matrix = np.array(cle.generate_touch_count_matrix(labels))
+    touch_count_array = np.array([touch_count_matrix[i][1:].sum() for i in id])
+
+    touch_portion = np.asarray(touch_count_array) / cell_statistics['Volume']
     cell_statistics['Contact portion'] = touch_portion
         
-    # for i in cell_statistics.keys():
-    #     print(f'{i }: {np.size(cell_statistics[i])}')
+    for i in cell_statistics.keys():
+        print(f'{i }: {np.size(cell_statistics[i])}')
     
     return pd.DataFrame(cell_statistics)
