@@ -26,18 +26,15 @@ def obtain_statistics(labels, voxel_resolution = [0.236e-6, 0.236e-6, 0.487e-6],
     
     label_vol_df = get_label_vol_distribution(labels)
     
-    print("Deleting small cells...")
     #Remove the labels which are below a certain threshold
     label_to_remove_df = label_vol_df.loc[label_vol_df["label_vol"] < min_label_vol]
     label_to_remove_lst = label_to_remove_df["label_id"].to_list()
     labels[np.isin(labels, label_to_remove_lst)] = 0
     
-    print("Removing unconnected regions...")
     #Remove the unconnected regions of the labels
     labels = remove_unconnected_regions_of_labels(labels)
 
     # Erode the labels of the cells in the image. 
-    print("Smoothing labels...")
     labels = perform_cell_label_erosion(labels, nb_iterations = 1)
     
     # #Expand the labels to make sure that the cell surfaces are touching
@@ -48,9 +45,10 @@ def obtain_statistics(labels, voxel_resolution = [0.236e-6, 0.236e-6, 0.487e-6],
     cell_meshes = generate_cell_surface_meshes(labels, voxel_resolution)
 
     #######################################
+    
     id = np.unique(labels)[1:]
     cell_statistics = {}
-    
+    cell_statistics['ID'] = id
     ######### Elementary Statistics ########
     
     regionprops = skimage.measure.regionprops(labels)
@@ -63,24 +61,16 @@ def obtain_statistics(labels, voxel_resolution = [0.236e-6, 0.236e-6, 0.487e-6],
         volume.append(regionprops[i].area)
         
     cell_statistics['Elongation'] = elongation
-    cell_statistics['Volume'] = volume * voxel_resolution[0] * voxel_resolution[1] * voxel_resolution[2]
-    
-    ########################################
+    cell_statistics['Volume'] = np.array(volume)*voxel_resolution[0]*voxel_resolution[1]*voxel_resolution[2]
 
-    # Surface Area - Based on meshing - use Steve's implementation...
+
+    # Surface Area - Based on meshing - used Steve's implementation for meshing.
     s_area = []
-    for _ in tqdm(id):
+    for _ in tqdm(id, desc='Calculating surface area'):
         area = skimage.measure.mesh_surface_area(cell_meshes[_].vertices, cell_meshes[_].faces)
         s_area.append(area)
     cell_statistics['Surface area'] = s_area
     
-    ############# Membrane statistics #############
-    
-    # membranes = skimage.segmentation.find_boundaries(labels, mode='inner')
-    # l_membranes = membranes * labels
-    # m_statistics = cle.statistics_of_labelled_pixels(None, l_membranes)
-    
-    ################################################
     
     # Sphericity and compactness
     cell_statistics['Compactness'] = (np.power(cell_statistics['Volume'], 2)) /(np.power(cell_statistics['Surface area'], 3))
@@ -97,11 +87,7 @@ def obtain_statistics(labels, voxel_resolution = [0.236e-6, 0.236e-6, 0.487e-6],
     
     touch_count_matrix = np.array(cle.generate_touch_count_matrix(labels))
     touch_count_array = np.array([touch_count_matrix[i][1:].sum() for i in id])
-
-    touch_portion = np.asarray(touch_count_array) / cell_statistics['Volume']
+    touch_portion = np.asarray(touch_count_array) / np.array(volume)
     cell_statistics['Contact portion'] = touch_portion
-        
-    for i in cell_statistics.keys():
-        print(f'{i }: {np.size(cell_statistics[i])}')
     
     return pd.DataFrame(cell_statistics)

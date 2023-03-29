@@ -9,6 +9,7 @@ import cc3d
 from skimage.morphology import binary_erosion
 from skimage.segmentation import expand_labels
 from napari_process_points_and_surfaces import label_to_surface
+from tqdm import tqdm
 
 def add_padding(image, b_width):
     return np.pad(image, pad_width=b_width)
@@ -86,7 +87,7 @@ def remove_unconnected_regions_of_labels(label_img_ar):
         The image of the cell labels where the unconnected regions have been removed.
     """
     #Loop over the labels in the image
-    for label_id in np.unique(label_img_ar):
+    for label_id in tqdm(np.unique(label_img_ar), desc="Removing unconnected regions"):
         if label_id == 0: continue #The 0 label is for the background
 
         #Only select the part of the image that corresponds to the cell label
@@ -109,7 +110,7 @@ def remove_unconnected_regions_of_labels(label_img_ar):
 
 def perform_cell_label_erosion(img_label_ar, nb_iterations = 1):
     """
-    Errod the labels of the cells in the image. This is done by removing the voxels that are
+    Errode the labels of the cells in the image. This is done by removing the voxels that are
     at the boundary of the cell.
 
     Parameters:
@@ -124,7 +125,7 @@ def perform_cell_label_erosion(img_label_ar, nb_iterations = 1):
 
 
     #Loop over the labels in the image
-    for label_id in np.unique(img_label_ar):
+    for label_id in tqdm(np.unique(img_label_ar), desc = "Erroding cell labels"):
         if label_id == 0: continue #The 0 label is for the background
   
         #Only select the part of the image that corresponds to the cell label
@@ -161,7 +162,7 @@ def generate_cell_surface_meshes(label_img_ar, voxel_resolution, smoothing_itera
     #Loop over the labels in the image
     meshes = {}
     
-    for label_id in np.unique(label_img_ar):
+    for label_id in tqdm(np.unique(label_img_ar), desc = "Generating surface meshes for cell labels"):
         if label_id == 0: continue # The 0 label is for the background
 
         #Create the triangulated surface
