@@ -6,6 +6,7 @@ from tqdm import tqdm
 from misc import get_label_vol_distribution, remove_unconnected_regions_of_labels, perform_cell_label_erosion, generate_cell_surface_meshes
 from skimage.morphology import binary_erosion
 from skimage.segmentation import expand_labels
+import napari
 
 def obtain_statistics(labels, voxel_resolution = [0.236e-6, 0.236e-6, 0.487e-6], min_label_vol = 10000):
     """Obtains statistics of the cells in the label image.
@@ -22,7 +23,7 @@ def obtain_statistics(labels, voxel_resolution = [0.236e-6, 0.236e-6, 0.487e-6],
     ############ Preprocessing ############
     
     labels = np.einsum('kij->ijk', labels)
-    labels = np.pad(labels, pad_width=10, mode='constant', constant_values=0)
+    labels = np.pad(labels, pad_width=1, mode='constant', constant_values=0)
     
     label_vol_df = get_label_vol_distribution(labels)
     
@@ -37,8 +38,16 @@ def obtain_statistics(labels, voxel_resolution = [0.236e-6, 0.236e-6, 0.487e-6],
     # Erode the labels of the cells in the image. 
     labels = perform_cell_label_erosion(labels, nb_iterations = 1)
     
+    viewer = napari.view_image(labels)
+    viewer.add_labels(labels)
+     
     # #Expand the labels to make sure that the cell surfaces are touching
-    labels = expand_labels(labels, distance=2)
+    # Will need to be changed to a more robust method - ensure that the cell surfaces are touching
+    labels = expand_labels(labels, distance=1)
+    labels = expand_labels(labels, distance=1)
+    labels = expand_labels(labels, distance=1)
+    
+    viewer.add_labels(labels)
 
     # print("Saving cell surface meshes...")
     #Generate the surface meshes
@@ -62,8 +71,6 @@ def obtain_statistics(labels, voxel_resolution = [0.236e-6, 0.236e-6, 0.487e-6],
         
     cell_statistics['Elongation'] = elongation
     cell_statistics['Volume'] = np.array(volume)*voxel_resolution[0]*voxel_resolution[1]*voxel_resolution[2]
-
-
     # Surface Area - Based on meshing - used Steve's implementation for meshing.
     s_area = []
     for _ in tqdm(id, desc='Calculating surface area'):
