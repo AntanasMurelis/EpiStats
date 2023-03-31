@@ -253,52 +253,46 @@ def compute_cell_principal_axis(cell_mesh):
 
 
 #------------------------------------------------------------------------------------------------------------
-def compute_cell_contact_fraction(labeled_img, cell_id):
+def compute_cell_contact_area_fraction(cell_mesh_lst, cell_id, cell_neighbors_lst, contact_cutoff):
     """
-    Compute the fraction of the cell surface which is in contact with other cells.
+    Compute the fraction of the cell surface area which is in contact with other cells.
     
     Parameters:
     -----------
 
-    labeled_img: (np.array, 3D)
-        The tirangular meshes of the cell in the standard trimesh format
+    cell_mesh_lst: (list, tm.Trimesh)
+        List of the cell meshes in the standard trimesh format
 
     cell_id: (int)
-        The id of the cell for which we want to find the neighbors
+        The id of the cell for which we want to calculate the contact area fraction
+
+    cell_neighbors_lst: (list, int)
+        List of the ids of the neighbors of the cell
+
+    contact_cutoff: (float)
+        The cutoff distance in microns for two cells to be considered in contact
 
     Returns
     -------
-    contact_fraction: (float)
+        contact_fraction: (float)
     """
 
-    #Add some padding to the image
-    img_padded = np.pad(img, pad_width=10, mode='constant', constant_values=0)
 
+    #Keep track of all the faces of the given cell that are in contact with other cells
+    contact_faces = []
 
-    #Get the voxels of the cell
-    binary_img = img_padded == cell_id
+    #Loop over the neighbors of the cell
+    for neighbor_id in cell_neighbors_lst:
 
-    #Expand the volume of the cell by 2 voxels in each direction
-    expanded_cell_voxels = ndimage.binary_dilation(binary_img, iterations=2)
+        #Compute the shortest distance between the points of the given cell and the faces of the neighbor cell
+        closest_point, distance, triangle_id = tm.proximity.closest_point(cell_mesh_lst[cell_id], cell_mesh_lst[neighbor_id].vertices)
 
-    #Find the voxels that are directly in contact with the surface of the cell
-    cell_surface_voxels = expanded_cell_voxels ^ binary_img
+        #Get the indices of all the points that are closer than the cutoff distance
+        contact_points_idx = np.where(distance < contact_cutoff)[0]
 
-    #Count the number of voxels of the cell surface which are in contact with the background
-    nb_voxels_in_contact_with_bg = np.sum(img_padded[cell_surface_voxels] == 0)
+        print("contact_points_idx", contact_points_idx)
+        _exit(0)
 
-    #Count the number of voxels of tthe cell surface which are in contact with other cells
-    nb_voxels_in_contact_with_cells = np.sum((img_padded[cell_surface_voxels] != 0) & (img_padded[cell_surface_voxels] != cell_id))
-
-    #TO CONTINUE!! 
-    #This method needs to take into account the side length of the voxels, if the resolution is not equal in the 3 dimensions
-    #the contact fraction will be wrong
-
-    contact_fraction = float(nb_voxels_in_contact_with_cells) / float(nb_voxels_in_contact_with_bg + nb_voxels_in_contact_with_cells)
-
-    print(nb_voxels_in_contact_with_bg, np.sum(cell_surface_voxels), nb_voxels_in_contact_with_cells, contact_fraction)
-
-    return contact_fraction
 
 #------------------------------------------------------------------------------------------------------------
 
@@ -407,8 +401,9 @@ if __name__ == "__main__":
     #img = generate_image_of_sphere(sphere_radius=100, voxel_size=1)
 
     #Get the meshes of the cubes
-    #mesh_lst = convert_cell_labels_to_meshes(img, np.array([1, 1, 2]))
+    mesh_lst = convert_cell_labels_to_meshes(img, np.array([1, 1, 2]))
 
+    #Get the neighbors of the first cell
+    neighbors_lst = get_cell_neighbors(mesh_lst, 1)
 
-    for cell_id in np.unique(img)[1:]:
-        compute_cell_contact_fraction(img, cell_id)
+    compute_cell_contact_area_fraction(mesh_lst, 1, neighbors_lst, 1)
