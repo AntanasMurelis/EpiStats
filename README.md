@@ -1,4 +1,4 @@
-This scripts can be used to cell morphologicl statistics from a segmentation 3D image. 
+This scripts can be used on a 3D segmentation image to collect the morphological features of the cells. 
 
 ## Installation
 Install venv if not already done
