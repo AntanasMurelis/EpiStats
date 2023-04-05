@@ -15,7 +15,5 @@ Install the required packages
 
 ## Note
 - When tested against the cubic test geometry, the measurement of the area introduces a ~5% error from the  real area. 
-</br>
 - In the same conditions the measurement of the volume introduces a ~1.5% error from the real volume.
-</br>
 - The contact fraction introduces a ~2% error from the real value.
