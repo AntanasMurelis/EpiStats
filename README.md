@@ -1,6 +1,6 @@
 # Morphological Cell Statistics
 
-This repository contains a Python script and associated tools for calculating morphological statistics of cells in 3D images. The main script processes a labeled 3D image and computes various cell statistics, such as cell areas, volumes, elongation, and contact area fraction. The results are saved as CSV files for further analysis.
+This repository contains a Python script and associated tools for calculating morphological statistics of cells in 3D images. The main script processes a labeled 3D image and computes various cell statistics, such as cell areas, volumes, elongation, and contact area fraction. The results are saved as CSV files for further analysis. In addition, cell meshes and filtered cell meshes are saved in their respective directories.
 
 ## Requirements
 
