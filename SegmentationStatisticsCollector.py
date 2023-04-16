@@ -218,10 +218,8 @@ def convert_cell_labels_to_meshes(
             A list of triangular meshes, in the trimesh format.
     
     """
-    assert isinstance(voxel_resolution, np.ndarray)
-    assert voxel_resolution.ndim == 1 
-    assert voxel_resolution.shape[0] == 3 
-
+    
+    #Add padding to the image to make sure the cell surfaces are not in direct contact with the boundaries of the image
     if not preprocess:
         # Always add some extra padding to the image to make sure the cell surfaces are not 
         # in direct contact with the boundaries of the image. This would cause the meshes to be 
