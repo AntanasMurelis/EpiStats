@@ -31,11 +31,11 @@ Install the required packages
 git clone https://github.com/yourusername/morphological-cell-statistics.git
 cd morphological-cell-statistics
 ```
-2. Modify the *path/to/your_python_script.py* in the bash script (*run_jobs.sh*) to point to the Python script containing the collect_cell_morphological_statistics function and argparse.
+2. Modify the **path/to/your_python_script.py** in the bash script (**run_jobs.sh**) to point to the Python script containing the collect_cell_morphological_statistics function and argparse.
 
-3. Modify the *labeled_img* variable in the bash script (*run_jobs.sh*) to point to your labeled 3D image file.
+3. Modify the **labeled_img** variable in the bash script (**run_jobs.sh**) to point to your labeled 3D image file.
 
-4. Modify the *img_resolution* and *contact_cutoff* variables in the bash script (*run_jobs.sh)* to set the appropriate values for your image data.
+4. Modify the **img_resolution** and **contact_cutoff** variables in the bash script (**run_jobs.sh**) to set the appropriate values for your image data.
 
 5. Make sure the bash script (run_jobs.sh) is executable:
 ```
