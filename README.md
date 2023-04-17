@@ -70,6 +70,21 @@ The CSV files will include the following columns:
 * **cell_elongation**: The elongation of the cell, which is a measure of its shape anisotropy.
 * **cell_contact_area_fraction**: The fraction of the cell's surface area that is in contact with neighboring cells.
 
+## Visualization
+
+The `visualise_cells.py` script can be used to visualize the cell meshes and their corresponding label images. It can display all cells, a single cell, or the filtered cell meshes depending on the provided arguments.
+
+Usage:
+
+```bash
+python visualise_cells.py output_directory [--cell_id CELL_ID] [--filtered]
+
+--output_directory: Path to the output directory where the processed labels and cell meshes are stored.
+--cell_id CELL_ID: (Optional) View a specific cell mesh only. Provide the cell ID as an integer.
+--filtered: (Optional) View filtered cell meshes only.
+
+
+
 ## Note
 - When tested against the cubic test geometry, the measurement of the area introduces a ~5% error from the  real area. 
 - In the same conditions the measurement of the volume introduces a ~1.5% error from the real volume.

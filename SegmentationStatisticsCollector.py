@@ -191,7 +191,9 @@ def convert_cell_labels_to_meshes(
     img,
     voxel_resolution,
     smoothing_iterations=1,
-    preprocess=False
+    preprocess=False,
+    output_directory='output',
+    overwrite=False
 ):
     """
     Convert the labels of the cells in the 3D segmented image to triangular meshes. Please make sure that the 
@@ -212,6 +214,12 @@ def convert_cell_labels_to_meshes(
         preprocess (bool):
             If True, do not add padding to the image, otherwise add padding
 
+        output_directory (str, optional):
+            Name of the folder where the cell_meshes will be saved
+
+        overwrite (bool, optional):
+            If True, overwrite existing mesh files
+
     Returns:
     --------
         mesh_lst (list):
@@ -219,34 +227,35 @@ def convert_cell_labels_to_meshes(
     
     """
     
-    #Add padding to the image to make sure the cell surfaces are not in direct contact with the boundaries of the image
     if not preprocess:
-        # Always add some extra padding to the image to make sure the cell surfaces are not 
-        # in direct contact with the boundaries of the image. This would cause the meshes to be 
-        # only partially triangulated
         img_padded = np.pad(img, pad_width=10, mode='constant', constant_values=0)
     else:
         img_padded = img
 
-    #Store the meshes in this list
     mesh_lst = []
+    label_ids = np.unique(img)
 
-    #Loop over the labels in the image
-    for label_id in tqdm(np.unique(img), desc = "Converting labels to meshes"):
-        if label_id == 0: continue #The 0 label is for the background
+    meshes_folder = os.path.join(output_directory, 'cell_meshes')
+    if not os.path.exists(meshes_folder):
+        os.makedirs(meshes_folder)
 
-        #Create the triangulated surface
-        surface = label_to_surface(img_padded == label_id)
+    for label_id in tqdm(label_ids, desc="Converting labels to meshes"):
+        if label_id == 0: continue
 
-        #Extract the points and faces
-        points, faces = surface[0], surface[1]
-        points = points * voxel_resolution
+        cell_mesh_file = os.path.join(meshes_folder, f"cell_{label_id - 1}.stl")
 
-        #Create the surface mesh
-        cell_surface_mesh  = tm.Trimesh(points, faces)
+        if not os.path.isfile(cell_mesh_file) or overwrite:
+            surface = label_to_surface(img_padded == label_id)
+            points, faces = surface[0], surface[1]
+            points = points * voxel_resolution
 
-        #Smooth the surface mesh
-        cell_surface_mesh = tm.smoothing.filter_laplacian(cell_surface_mesh, iterations = smoothing_iterations)
+
+            cell_surface_mesh = tm.Trimesh(points, faces)
+            cell_surface_mesh = tm.smoothing.filter_laplacian(cell_surface_mesh, iterations=smoothing_iterations)
+
+            cell_surface_mesh.export(cell_mesh_file)
+        else:
+            cell_surface_mesh = tm.load_mesh(cell_mesh_file)
 
         mesh_lst.append(cell_surface_mesh)
 
@@ -502,7 +511,7 @@ def process_labels(labeled_img, erosion_iterations=1, dilation_iterations=2, out
 
 
 #------------------------------------------------------------------------------------------------------------
-def save_meshes(mesh_lst, filtered_cell_id_lst, output_directory='output', clear_meshes_folder=False):
+def save_meshes(mesh_lst, filtered_cell_id_lst, output_directory='output', clear_meshes_folder=False, overwrite=False):
     """
     Save the cell meshes to the specified folders.
 
@@ -519,6 +528,9 @@ def save_meshes(mesh_lst, filtered_cell_id_lst, output_directory='output', clear
 
     clear_meshes_folder: (bool, optional, default=False)
         If True, delete all the current meshes in the "cell_meshes" and "filtered_cell_meshes" directories before saving new meshes
+
+    overwrite: (bool, optional, default=False)
+        If True, overwrite existing mesh files
 
     Returns:
     --------
@@ -544,9 +556,14 @@ def save_meshes(mesh_lst, filtered_cell_id_lst, output_directory='output', clear
 
     # Save the meshes of the cells to the folder
     for cell_id, mesh in enumerate(mesh_lst):
-        mesh.export(os.path.join(meshes_folder, f"cell_{cell_id}.stl"))
-        if cell_id + 1 in filtered_cell_id_lst:
-            mesh.export(os.path.join(filtered_meshes_folder, f"filtered_cell_{cell_id}.stl"))
+        mesh_file = os.path.join(meshes_folder, f"cell_{cell_id}.stl")
+        filtered_mesh_file = os.path.join(filtered_meshes_folder, f"filtered_cell_{cell_id}.stl")
+
+        if not os.path.isfile(mesh_file) or overwrite:
+            mesh.export(mesh_file)
+        
+        if (cell_id + 1) in filtered_cell_id_lst and (not os.path.isfile(filtered_mesh_file) or overwrite):
+            mesh.export(filtered_mesh_file)
 #------------------------------------------------------------------------------------------------------------
 
 
@@ -619,6 +636,7 @@ def collect_cell_morphological_statistics(labeled_img, img_resolution, contact_c
     else:
         preprocessed_labels = labeled_img
 
+    del labeled_img
     # Get the list of the ids of the cells in the image
     cell_id_lst = np.unique(preprocessed_labels)[1:]
 
@@ -637,6 +655,7 @@ def collect_cell_morphological_statistics(labeled_img, img_resolution, contact_c
         # Remove the cells that are touching the background, leaving all the "inner" cells
         filtered_labeled_img = remove_labels_touching_background(preprocessed_labels)
         np.save(filtered_labeled_img_path, filtered_labeled_img)
+    
     
     filtered_cell_id_lst = np.unique(filtered_labeled_img)[1:]
 
@@ -658,6 +677,9 @@ def collect_cell_morphological_statistics(labeled_img, img_resolution, contact_c
     # Get the list of the neighbors of each cell using the new cell_id_list, but obtain neighbors from the original labeled_img
     cell_neighbors_lst = [get_cell_neighbors(preprocessed_labels, cell_id) for cell_id in cell_id_lst]
 
+    # Delete the preprocessed labels to free up memory
+    del preprocessed_labels
+    
     # Get the number of neighbors of each cell
     cell_nb_of_neighbors = [len(cell_neighbors) for cell_neighbors in cell_neighbors_lst]
 
@@ -735,4 +757,4 @@ if __name__ == "__main__":
     # img = np.einsum('kij->ijk', labels)
     
     #Collect the statistics of the cells
-    cell_statistics_df = collect_cell_morphological_statistics(img, np.array([0.21, 0.21, 0.39]), 0.8, clear_meshes_folder=True, output_folder="test1", meshes_only=True, overwrite=True)
+    cell_statistics_df = collect_cell_morphological_statistics(img, np.array([0.21, 0.21, 0.39]), 0.8, clear_meshes_folder=False, output_folder="Project_Bladder_cancer", meshes_only=False, overwrite=False)
