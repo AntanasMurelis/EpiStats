@@ -48,7 +48,6 @@ if __name__ == '__main__':
     parser.add_argument('--filtered', action='store_true', help='View filtered cell meshes only')
     args = parser.parse_args()
 
-    # Load the processed labels
     processed_labels_path = os.path.join(args.output_directory, 'processed_labels.npy')
 
     overlay_meshes_and_labels(processed_labels_path, args.output_directory, args.cell_id, args.filtered)
