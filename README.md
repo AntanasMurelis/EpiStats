@@ -80,9 +80,11 @@ Usage:
 python visualise_cells.py output_directory [--cell_id CELL_ID] [--filtered]
 ```
 
---output_directory: Path to the output directory where the processed labels and cell meshes are stored.
---cell_id CELL_ID: (Optional) View a specific cell mesh only. Provide the cell ID as an integer.
---filtered: (Optional) View filtered cell meshes only.
+**output_directory: Path to the output directory where the processed labels and cell meshes are stored.
+
+**cell_id CELL_ID: (Optional) View a specific cell mesh only. Provide the cell ID as an integer.
+
+**filtered: (Optional) View filtered cell meshes only.
 
 
 
