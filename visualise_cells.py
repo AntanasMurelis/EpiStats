@@ -41,22 +41,22 @@ def overlay_meshes_and_labels(label_image_path, output_folder, cell_id=None, fil
 #--------------------------------------------------------------------------------
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='View cell meshes and labels.')
-    parser.add_argument('output_directory', type=str, help='Path to the output directory')
-    parser.add_argument('--cell_id', type=int, help='View a specific cell mesh only')
-    parser.add_argument('--filtered', action='store_true', help='View filtered cell meshes only')
-    args = parser.parse_args()
-
-    processed_labels_path = os.path.join(args.output_directory, 'processed_labels.npy')
-
-    overlay_meshes_and_labels(processed_labels_path, args.output_directory, args.cell_id, args.filtered)
-
 # if __name__ == '__main__':
-#     # Load the processed labels (change the path to your output directory)
-#     output_directory = '/Users/antanas/BC_Project_s_5_e_2_d_3'
-#     processed_labels_path = os.path.join(output_directory, 'processed_labels.npy')
-#     processed_labels = np.load(processed_labels_path)
+#     parser = argparse.ArgumentParser(description='View cell meshes and labels.')
+#     parser.add_argument('output_directory', type=str, help='Path to the output directory')
+#     parser.add_argument('--cell_id', type=int, help='View a specific cell mesh only')
+#     parser.add_argument('--filtered', action='store_true', help='View filtered cell meshes only')
+#     args = parser.parse_args()
+
+#     processed_labels_path = os.path.join(args.output_directory, 'processed_labels.npy')
+
+#     overlay_meshes_and_labels(processed_labels_path, args.output_directory, args.cell_id, args.filtered)
+
+if __name__ == '__main__':
+    # Load the processed labels (change the path to your output directory)
+    output_directory = '/Users/antanas/GitRepo/EpiStats/Project_Bladder_cancer_s_5_e_1_d_2'
+    processed_labels_path = os.path.join(output_directory, 'processed_labels.npy')
+    processed_labels = np.load(processed_labels_path)
     
-#     overlay_meshes_and_labels(processed_labels_path, output_directory, cell_id = 31)
+    overlay_meshes_and_labels(processed_labels_path, output_directory, cell_id = None)
 

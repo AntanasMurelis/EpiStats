@@ -10,6 +10,8 @@ from skimage import io
 from tqdm import tqdm
 import os
 import napari
+import concurrent.futures
+
 """
     The methods in this script gather statistics from the 3D segmented labeled images. 
 """
@@ -177,9 +179,7 @@ def extend_labels(labeled_img, erosion_iterations=1, dilation_iterations=2):
         background_mask = (extended_labeled_img == 0)
         label_mask = np.logical_and(dilated_mask, background_mask)
         extended_labeled_img[label_mask] = label
-
-    
-    
+        
     return extended_labeled_img
 #------------------------------------------------------------------------------------------------------------
 
@@ -193,7 +193,8 @@ def convert_cell_labels_to_meshes(
     smoothing_iterations=1,
     preprocess=False,
     output_directory='output',
-    overwrite=False
+    overwrite=False,
+    pad_width=10
 ):
     """
     Convert the labels of the cells in the 3D segmented image to triangular meshes. Please make sure that the 
@@ -227,10 +228,8 @@ def convert_cell_labels_to_meshes(
     
     """
     
-    if not preprocess:
-        img_padded = np.pad(img, pad_width=10, mode='constant', constant_values=0)
-    else:
-        img_padded = img
+
+    img_padded = np.pad(img, pad_width=pad_width, mode='constant', constant_values=0)
 
     mesh_lst = []
     label_ids = np.unique(img)
@@ -247,7 +246,7 @@ def convert_cell_labels_to_meshes(
         if not os.path.isfile(cell_mesh_file) or overwrite:
             surface = label_to_surface(img_padded == label_id)
             points, faces = surface[0], surface[1]
-            points = points * voxel_resolution
+            points = (points - np.array([pad_width, pad_width, pad_width])) * voxel_resolution
 
 
             cell_surface_mesh = tm.Trimesh(points, faces)
@@ -499,6 +498,8 @@ def process_labels(labeled_img, erosion_iterations=1, dilation_iterations=2, out
         unconnected_labels = remove_unconnected_regions(labeled_img, pad_width=10)
         renumbered_labeled_img = renumber_labels(unconnected_labels)
         preprocessed_labels = extend_labels(renumbered_labeled_img, erosion_iterations=erosion_iterations, dilation_iterations=dilation_iterations)
+        #  Remove the padding:
+        preprocessed_labels = preprocessed_labels[10:-10, 10:-10, 10:-10]
         
         # Save the processed_labels
         if not os.path.exists(output_directory):
@@ -570,8 +571,8 @@ def save_meshes(mesh_lst, filtered_cell_id_lst, output_directory='output', clear
 #------------------------------------------------------------------------------------------------------------
 def collect_cell_morphological_statistics(labeled_img, img_resolution, contact_cutoff, clear_meshes_folder=False,
                                           smoothing_iterations=5, erosion_iterations=1, dilation_iterations=2,
-                                          output_folder='output', meshes_only=False, overwrite=False, preprocess=True,
-                                          **kwargs):
+                                          output_folder='output', meshes_only=False, overwrite=False, preprocess=True, 
+                                          max_workers=None, **kwargs):
     """
     Collect the following statistics about the cells:
         - cell_areas
@@ -694,10 +695,14 @@ def collect_cell_morphological_statistics(labeled_img, img_resolution, contact_c
 
     # Get the contact area fraction of each cell
 
-    cell_contact_area_fraction_lst = []
-    for cell_id in cell_id_lst:
-        contact_area_fraction = compute_cell_contact_area_fraction(mesh_lst, cell_id, cell_neighbors_lst[cell_id - 1], contact_cutoff)
-        cell_contact_area_fraction_lst.append(contact_area_fraction)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        cell_contact_area_futures = {executor.submit(compute_cell_contact_area_fraction, mesh_lst, cell_id, cell_neighbors, contact_cutoff): cell_id
+                                     for cell_id, cell_neighbors in enumerate(cell_neighbors_lst, start=1)}
+
+        # Collect the results as they complete
+        cell_contact_area_fraction_lst = []
+        for future in concurrent.futures.as_completed(cell_contact_area_futures):
+            cell_contact_area_fraction_lst.append(future.result())
 
     #Reformat the principal axis list and the neighbor list to be in the format of a string
     to_scientific_str = lambda x: '{:.2e}'.format(x)
@@ -757,4 +762,4 @@ if __name__ == "__main__":
     # img = np.einsum('kij->ijk', labels)
     
     #Collect the statistics of the cells
-    cell_statistics_df = collect_cell_morphological_statistics(img, np.array([0.21, 0.21, 0.39]), 0.8, clear_meshes_folder=False, output_folder="Project_Bladder_cancer", meshes_only=False, overwrite=False)
+    cell_statistics_df = collect_cell_morphological_statistics(img, np.array([0.21, 0.21, 0.39]), 0.8, clear_meshes_folder=True, output_folder="Project_Bladder_cancer", meshes_only=False, overwrite=True)
