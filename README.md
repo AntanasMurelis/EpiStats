@@ -1,6 +1,6 @@
 # Morphological Cell Statistics
 
-This repository contains a Python script and associated tools for calculating morphological statistics of cells in 3D images. The main script processes a labeled 3D image and computes various cell statistics, such as cell areas, volumes, elongation, and contact area fraction. The results are saved as CSV files for further analysis. In addition, cell meshes and filtered cell meshes are saved in their respective directories.
+This repository contains a Python script and associated tools for calculating morphological statistics of cells in 3D images. The main script processes a labeled 3D image and computes various cell statistics, such as cell areas, volumes, elongation, and contact area fraction. The results are saved as CSV files for further analysis. In addition, cell meshes and filtered cell meshes are saved in their respective directories. The script also generates plots for the cell statistics.
 
 ## Requirements
 
@@ -9,7 +9,8 @@ This repository contains a Python script and associated tools for calculating mo
 * pandas
 * scikit-image
 * trimesh
-
+* seaborn
+* matplotlib
 
 ## Installation
 Install venv if not already done
@@ -26,7 +27,6 @@ Install the required packages
 
 # Usage
 
-
 1. Modify the **path/to/your_python_script.py** in the bash script (**run_jobs.sh**) to point to the Python script containing the collect_cell_morphological_statistics function and argparse.
 
 2. Modify the **labeled_img** variable in the bash script (**run_jobs.sh**) to point to your labeled 3D image file.
@@ -34,6 +34,7 @@ Install the required packages
 3. Modify the **img_resolution** and **contact_cutoff** variables in the bash script (**run_jobs.sh**) to set the appropriate values for your image data.
 
 4. Make sure the bash script (run_jobs.sh) is executable:
+
 ```
 chmod +x run_jobs.sh
 
@@ -44,7 +45,8 @@ chmod +x run_jobs.sh
 ./run_jobs.sh
 ```
 
-The cell statistics will be saved as CSV files in the output folder with the specified naming convention (e.g., *output_s_5_e_1_d_3* for 5 smoothing iterations, 1 erosion iteration, and 3 dilation iterations).
+
+The cell statistics will be saved as CSV files in the output folder with the specified naming convention (e.g., *output_s_5_e_1_d_3* for 5 smoothing iterations, 1 erosion iteration, and 3 dilation iterations). Plots for the cell statistics will also be generated.
 
 ## Output
 
@@ -53,6 +55,7 @@ The output folder will contain the following files and directories:
 *	**filtered_cell_statistics.csv**: Contains the statistics for cells that are not touching the background.
 *	**cell_meshes**: Directory containing the mesh files for all cells in the labeled 3D image.
 *	**filtered_cell_meshes**: Directory containing the mesh files for cells that are not touching the background.
+*   **plots**: Directory containing the generated plots for the cell statistics.
 
 The CSV files will include the following columns:
 
@@ -82,7 +85,9 @@ python visualise_cells.py output_directory [--cell_id CELL_ID] [--filtered]
 
 * **filtered**: (Optional) View filtered cell meshes only.
 
+## Plotting
 
+The `generate_plots` function in the main script can generate plots for the cell statistics. It supports 'violin' plots, 'box' plots, and 'histogram'. The plots can be saved in a specified output folder or displayed without saving.
 
 ## Note
 - When tested against the cubic test geometry, the measurement of the area introduces a ~5% error from the  real area. 

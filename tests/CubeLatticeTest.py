@@ -116,7 +116,7 @@ def generate_cube_lattice_image(
     assert nb_cubes_z >= 1, "nb_cubes_z must be positive"
 
     #Generate the image with the background (background = 0)
-    img = np.zeros((nb_x_voxels, nb_y_voxels, nb_z_voxels), dtype=np.uint8)
+    img = np.zeros((nb_x_voxels, nb_y_voxels, nb_z_voxels), dtype=np.uint16)
 
     #Add the cubes to the image
     cube_label = 1
