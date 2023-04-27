@@ -19,7 +19,7 @@ if __name__ == "__main__":
     parser.add_argument("--preprocess", action="store_true", help="Run preprocessing on the input labeled image")
     parser.add_argument("--calculate_contact_area_fraction", action="store_true", help="Calculate the contact area fraction for each cell (default: True)")
     parser.add_argument("--max_workers", type=int, default=None, help="Maximum number of workers for parallel computation (default: number of CPU cores - 1)")
-    parser.add_argument("--plot", type=str, default=None, help="Attribute to plot (default: None)")
+    parser.add_argument("--plot", type=str, choices=['filtered', 'both', 'all', None], default=None, help="Generate plots for the cell statistics. Options: 'filtered', 'both', 'all', or None (default: None)")
     parser.add_argument("--plot_type", type=str, default="violin", help="Type of plot to generate (default: 'violin')")
     
     args = parser.parse_args()
