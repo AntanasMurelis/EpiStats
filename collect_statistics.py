@@ -17,6 +17,10 @@ if __name__ == "__main__":
     parser.add_argument("--meshes_only", action="store_true", help="Save meshes only without computing statistics")
     parser.add_argument("--overwrite", action="store_true", help="Overwrite preprocessed labels if they already exist")
     parser.add_argument("--preprocess", action="store_true", help="Run preprocessing on the input labeled image")
+    parser.add_argument("--calculate_contact_area_fraction", action="store_true", help="Calculate the contact area fraction for each cell (default: True)")
+    parser.add_argument("--max_workers", type=int, default=None, help="Maximum number of workers for parallel computation (default: number of CPU cores - 1)")
+    parser.add_argument("--plot", type=str, default=None, help="Attribute to plot (default: None)")
+    parser.add_argument("--plot_type", type=str, default="violin", help="Type of plot to generate (default: 'violin')")
     
     args = parser.parse_args()
 
@@ -31,5 +35,9 @@ if __name__ == "__main__":
         output_folder=args.output_folder,
         meshes_only=args.meshes_only,
         overwrite=args.overwrite,
-        preprocess=args.preprocess
+        preprocess=args.preprocess,
+        calculate_contact_area_fraction=args.calculate_contact_area_fraction,
+        max_workers=args.max_workers,
+        plot=args.plot,
+        plot_type=args.plot_type
     )
