@@ -690,7 +690,7 @@ def generate_plots(input_data, columns_to_plot=None, plot_type='violin', output_
 def collect_cell_morphological_statistics(labeled_img, img_resolution, contact_cutoff, clear_meshes_folder=False,
                                           smoothing_iterations=5, erosion_iterations=1, dilation_iterations=2,
                                           output_folder='output', meshes_only=False, overwrite=False, preprocess=True, 
-                                          max_workers=None, calculate_contact_area_fraction = True, plot=None, plot_type='violin',
+                                          max_workers=None, calculate_contact_area_fraction = False, plot=None, plot_type='violin',
                                           *args, **kwargs) -> pd.DataFrame:
     """
     Collect the following statistics about the cells:
