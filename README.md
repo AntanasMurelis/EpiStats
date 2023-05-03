@@ -89,7 +89,7 @@ python visualise_cells.py output_directory [--cell_id CELL_ID] [--filtered]
 
 The `generate_plots` function in the main script can generate plots for the cell statistics. It supports 'violin' plots, 'box' plots, and 'histogram'. The plots can be saved in a specified output folder or displayed without saving.
 
-![Statistics of Cubes example](./images/filtered_cell_plots.png)
+![Statistics of Cubes example](/images/filtered_cell_plots.png)
 
 ## Note
 - When tested against the cubic test geometry, the measurement of the area introduces a ~5% error from the  real area. 
