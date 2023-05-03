@@ -901,7 +901,8 @@ def collect_cell_morphological_statistics(labeled_img, img_resolution, contact_c
             cell_contact_area_fraction_lst.append(future.result())
     else:
         cell_contact_area_fraction_lst = [None] * len(cell_id_lst)
-        
+    
+    print(cell_contact_area_fraction_lst)
 
     #Reformat the principal axis list and the neighbor list to be in the format of a string
     to_scientific_str = lambda x: '{:.2e}'.format(x)
@@ -953,9 +954,9 @@ if __name__ == "__main__":
         nb_y_voxels=200,
         nb_z_voxels=200,
         cube_side_length=5,
-        nb_cubes_x=5,
-        nb_cubes_y=5,
-        nb_cubes_z=5,
+        nb_cubes_x=2,
+        nb_cubes_y=2,
+        nb_cubes_z=2,
         interstitial_space=-1,
     )
 
@@ -971,7 +972,11 @@ if __name__ == "__main__":
     # cell_statistics_df = collect_cell_morphological_statistics(img, np.array([0.21, 0.21, 0.39]), contact_cutoff = 0.8, clear_meshes_folder=False, output_folder="/Users/antanas/BC_Project/Control_Segmentation/BC_control", meshes_only=False, overwrite=False,
     #                                                            smoothing_iterations=5, erosion_iterations=2, dilation_iterations=3)
     
-    cell_statistics_df = collect_cell_morphological_statistics(img, np.array([0.21, 0.21, 0.39]), contact_cutoff = 0.2, clear_meshes_folder=False, output_folder="Cube_test", meshes_only=False, overwrite=False,
-                                                               smoothing_iterations=5, erosion_iterations=2, dilation_iterations=3, max_workers=4, calculate_contact_area_fraction=True, plot = 'both', plot_type = 'violin')
+    cell_statistics_df = collect_cell_morphological_statistics(img, np.array([0.21, 0.21, 0.39]), contact_cutoff = 0.2, clear_meshes_folder=True, output_folder="Cube_test", preprocess = False, meshes_only=False, overwrite=True,
+                                                              smoothing_iterations=5, erosion_iterations=2, dilation_iterations=3, max_workers=4, calculate_contact_area_fraction=True, plot = 'all', plot_type = 'violin')
     # print(cell_statistics_df)
-    # generate_plots(input_data = cell_statistics_df, plot_type='violin')
+    generate_plots(input_data = '/Users/antanas/GitRepo/EpiStats/all_cell_statistics.csv', plot_type='violin')
+    
+    cell_statistics_df = collect_cell_morphological_statistics(labeled_img = img, img_resolution = np.array([0.21, 0.21, 0.39]), contact_cutoff = 0.2, clear_meshes_folder=True, 
+                                                                output_folder="Cube_test", preprocess = False, meshes_only=False, overwrite=True, 
+                                                                max_workers=4, calculate_contact_area_fraction=True, plot = 'all', plot_type = 'violin')
