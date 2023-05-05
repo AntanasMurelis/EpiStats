@@ -253,7 +253,8 @@ def convert_cell_labels_to_meshes(
     if not os.path.exists(meshes_folder):
         os.makedirs(meshes_folder)
 
-    for label_id in tqdm(label_ids, desc="Converting labels to meshes"):
+    for label_id in tqdm(label_ids, 
+                         desc="Converting labels to meshes"):
         if label_id == 0: continue
 
         cell_mesh_file = os.path.join(meshes_folder, f"cell_{label_id - 1}.stl")
@@ -472,7 +473,7 @@ def compute_cell_contact_area_fraction(cell_mesh_lst, cell_id, cell_neighbors_ls
 
 
 #------------------------------------------------------------------------------------------------------------
-def process_labels(labeled_img, erosion_iterations=1, dilation_iterations=2, output_directory='output', overwrite=False):
+def process_labels(labeled_img, erosion_iterations=1, dilation_iterations=2, output_directory='output', overwrite=False, renumber=False):
     """
     Process the labels by removing unconnected regions, renumbering the labels, and extending them.
 
@@ -495,6 +496,9 @@ def process_labels(labeled_img, erosion_iterations=1, dilation_iterations=2, out
     overwrite: (bool, optional, default=False)
         If True, overwrite the existing processed_labels.npy file
 
+    renumber: (bool, optional, default=False)
+        If True, renumber the labels after removal of unconnected regions
+
     Returns:
     --------
     preprocessed_labels: (np.array, 3D)
@@ -502,7 +506,8 @@ def process_labels(labeled_img, erosion_iterations=1, dilation_iterations=2, out
     """
 
     # Check if processed_labels file exists
-    processed_labels_file = os.path.join(output_directory, 'processed_labels.npy')
+    file_name = 'processed_labels_er{}_dil{}.npy'.format(erosion_iterations, dilation_iterations)
+    processed_labels_file = os.path.join(output_directory, file_name)
 
     if os.path.exists(processed_labels_file) and not overwrite:
         # Load the existing processed_labels
@@ -510,8 +515,13 @@ def process_labels(labeled_img, erosion_iterations=1, dilation_iterations=2, out
     else:
         # Generate processed_labels
         unconnected_labels = remove_unconnected_regions(labeled_img, pad_width=10)
-        renumbered_labeled_img = renumber_labels(unconnected_labels)
-        preprocessed_labels = extend_labels(renumbered_labeled_img, erosion_iterations=erosion_iterations, dilation_iterations=dilation_iterations)
+        if renumber:
+            updated_labels = renumber_labels(unconnected_labels)
+        else:
+            updated_labels = unconnected_labels     
+        preprocessed_labels = extend_labels(updated_labels, 
+                                            erosion_iterations=erosion_iterations, 
+                                            dilation_iterations=dilation_iterations)
         #  Remove the padding:
         preprocessed_labels = preprocessed_labels[10:-10, 10:-10, 10:-10]
         
