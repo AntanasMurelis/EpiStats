@@ -980,11 +980,22 @@ if __name__ == "__main__":
     # cell_statistics_df = collect_cell_morphological_statistics(img, np.array([0.21, 0.21, 0.39]), contact_cutoff = 0.8, clear_meshes_folder=False, output_folder="/Users/antanas/BC_Project/Control_Segmentation/BC_control", meshes_only=False, overwrite=False,
     #                                                            smoothing_iterations=5, erosion_iterations=2, dilation_iterations=3)
     
-    cell_statistics_df = collect_cell_morphological_statistics(img, np.array([0.21, 0.21, 0.39]), contact_cutoff = 0.2, clear_meshes_folder=True, output_folder="Cube_test", preprocess = False, meshes_only=False, overwrite=True,
-                                                              smoothing_iterations=5, erosion_iterations=2, dilation_iterations=3, max_workers=4, calculate_contact_area_fraction=True, plot = 'all', plot_type = 'violin')
+    # cell_statistics_df = collect_cell_morphological_statistics(img, np.array([0.21, 0.21, 0.39]), contact_cutoff = 0.2, clear_meshes_folder=True, output_folder="Cube_test", preprocess = False, meshes_only=False, overwrite=True,
+                                                            #   smoothing_iterations=5, erosion_iterations=2, dilation_iterations=3, max_workers=4, calculate_contact_area_fraction=True, plot = 'all', plot_type = 'violin')
     # print(cell_statistics_df)
     # generate_plots(input_data = '/Users/antanas/GitRepo/EpiStats/all_cell_statistics.csv', plot_type='violin')
     
-    cell_statistics_df = collect_cell_morphological_statistics(labeled_img = 'path to .tif or 3D array of your image', img_resolution = np.array([0.21, 0.21, 0.39]), contact_cutoff = 0.2, clear_meshes_folder=True, 
-                                                                output_folder="Cube_test", preprocess = False, meshes_only=False, overwrite=True, 
-                                                                max_workers=4, calculate_contact_area_fraction=True, plot = 'all', plot_type = 'violin')
+    cell_statistics_df = collect_cell_morphological_statistics(
+        labeled_img = 'path to .tif or 3D array of your image', 
+        img_resolution = np.array([0.21, 0.21, 0.39]), 
+        contact_cutoff = 0.2, 
+        clear_meshes_folder=True, 
+        output_folder="Cube_test", 
+        preprocess = False, 
+        meshes_only=False, 
+        overwrite=True,
+        max_workers=4, 
+        calculate_contact_area_fraction=True, 
+        plot = 'all', 
+        plot_type = 'violin')
+
