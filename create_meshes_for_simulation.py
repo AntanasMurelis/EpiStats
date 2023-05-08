@@ -214,10 +214,10 @@ def convert_to_vtk(
 def main(
     img_path,
     output_dir,
-    dilation_iters,
-    erosion_iters,
     voxel_size,
-    smoothing_iters=10,
+    dilation_iters=1,
+    erosion_iters=2,
+    smoothing_iters=5,
     combined_mesh=True,
     labels_to_convert="all",
 ):
@@ -236,7 +236,8 @@ def main(
         erosion_iterations=erosion_iters, 
         output_directory=os.path.join(output_dir, "processed_labels"), 
         overwrite=False, 
-        renumber=False)
+        renumber=False
+    )
     # set the path to the processed labels file
     processed_file_name = 'processed_labels_er{}_dil{}.npy'.format(erosion_iters, dilation_iters)
     processed_img_path =  os.path.join(output_dir, "processed_labels", processed_file_name)
@@ -258,13 +259,13 @@ def main(
     #-----------------------------------
     # 3. Export mesh files
     print("3. Exporting mesh files...")
-    output_dir = os.path.join(output_dir, "_smooth{}".format(smoothing_iters))
+    out_dir = os.path.join(output_dir, "smoothing_iters_{}".format(smoothing_iters))
     mesh_paths = []
     for mesh, id in tqdm(zip(meshes, labels_list), desc="Exporting meshes: ", total=len(labels_list)):
         curr_path = export_mesh(
             mesh=mesh,
             id=id,
-            save_dir=os.path.join(output_dir, 'stl_files'),
+            save_dir=os.path.join(out_dir, 'stl_files'),
             file_type='.stl',
             overwrite=False
         )
@@ -276,7 +277,7 @@ def main(
         combined_mesh_path = export_mesh(
             mesh=combined_mesh,
             id="combined",
-            save_dir=os.path.join(output_dir, 'stl_files'),
+            save_dir=os.path.join(out_dir, 'stl_files'),
             file_type='.stl',
             overwrite=False
         )
@@ -285,7 +286,7 @@ def main(
     #-----------------------------------
     # 4. Convert meshes into .vtk format
     print("4. Converting into .vtk format...")
-    vtk_dir = os.path.join(output_dir, "vtk_files")
+    vtk_dir = os.path.join(out_dir, "vtk_files")
     if combined_mesh:
         convert_to_vtk(combined_mesh_path, os.path.join(vtk_dir, "combined"))
 
@@ -294,23 +295,38 @@ def main(
 #------------------------------------------------------------------------------------------------------------
 
 
+
+#------------------------------------------------------------------------------------------------------------
 if __name__ == "__main__":
 
-    path_to_dir = "/nas/groups/iber/Users/Federico_Carrara/create_meshes/data/curated_labels_clean/"
-    image_name = "lung_new_sample_b_curated_segmentation_central_crop_relabeled_filled.tif"
-    img_path = os.path.join(path_to_dir, image_name)
+    # path_to_dir = "/nas/groups/iber/Users/Federico_Carrara/create_meshes/data/curated_labels_clean/"
+    # image_name = "lung_new_sample_b_curated_segmentation_central_crop_relabeled_filled.tif"
+    # img_path = os.path.join(path_to_dir, image_name)
 
-    cells_ids = [2, 7, 22, 24, 29, 31, 35, 40, 45, 46, 48, 51, 65, 80, 120, 121, 122, 124]
+    # cells_ids = [2, 7, 22, 24, 29, 31, 35, 40, 45, 46, 48, 51, 65, 80, 120, 121, 122, 124]
+
+    parser = argparse.ArgumentParser(description="Convert cells from labels to meshes in .vtk format")
+    
+    parser.add_argument("img_path", type=str, help="Path to the labeled image")
+    parser.add_argument("output_dir", type=str, default="output", help="Name of the folder where the processed labels, cell_meshes, and filtered_cell_meshes will be saved (default: 'output')")
+    parser.add_argument("voxel_size", type=float, nargs=3, help="Image resolution in microns (x, y, z)")
+    parser.add_argument("--dilation_iters", type=int, default=2, help="Number of iterations for dilation during label extension (default: 2)")
+    parser.add_argument("--erosion_iters", type=int, default=1, help="Number of iterations for erosion during label extension (default: 1)")
+    parser.add_argument("--smoothing_iters", type=int, default=5, help="Number of smoothing iterations applied to the mesh (default: 5)")
+    parser.add_argument("--combined_mesh", type=bool, default=True, help="If true the combined mesh of all the labels to convert is made.")
+    parser.add_argument("--labels_to_convert", defaul="all", help="Either 'all', or a list between [] of the labels to be converted")
+    
+    args = parser.parse_args()
 
     main(
-        img_path=img_path,
-        output_dir='./try',
-        erosion_iters=2,
-        dilation_iters=4,
-        smoothing_iters=10,
-        voxel_size=(0.1625, 0.1625, 0.25),
-        combined_mesh=True,
-        labels_to_convert=cells_ids
+        img_path=args.img_path,
+        output_dir=args.output_dir,
+        voxel_size=args.voxel_size,
+        erosion_iters=args.erosion_iters,
+        dilation_iters=args.dilation_iters,
+        smoothing_iters=args.smoothing_iters,
+        combined_mesh=args.combined_mesh,
+        labels_to_convert=args.labels_to_convert
     )
 
 
