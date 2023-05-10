@@ -12,7 +12,7 @@ voxel_size="0.1625 0.1625 0.25"
 dilation_iters="--dilation_iters 4"
 erosion_iters="--erosion_iters 2"
 combined_mesh="--combined_mesh"
-labels_to_convert="--labels_to_convert"
+labels_to_convert="--labels_to_convert 2 7 22 24 29 31 35 40 45 46 48 51 65 80 120 121 122 124"
 
 # Set the path to the directory containing the input files
 input_directory="/cluster/work/cobi/federico/EpiStats/data/curated_labels_clean/bladder_samples/"
@@ -20,17 +20,19 @@ input_directory="/cluster/work/cobi/federico/EpiStats/data/curated_labels_clean/
 # Iterate through the input files in the directory
 for smoothing_iterations in {5,10,20,50,100}; do
   # Create a job script for the current number of simulations
-  smoothing_iters="--smoothing_iters ${smoothing_iterations}"
+  smoothing_iters="--smoothing_iters $smoothing_iterations"
+  out_dir="${output_dir}_smooth_iters_${smoothing_iterations}"
+  job_script="job_smoothing_iters_$smoothing_iterations.sh"
   echo "#!/bin/bash" > $job_script
-  echo "#SBATCH --job-name=convert_meshes_sim_iters_${smooothing_iterations}" >> $job_script
+  echo "#SBATCH --job-name=convert_meshes_sim_iters_$smooothing_iterations" >> $job_script
   echo "#SBATCH --output=logs/convert_meshes_sim_iters_${smooothing_iterations}.out" >> $job_script
   echo "#SBATCH --error=logs/convert_meshes_sim_iters_${smooothing_iterations}.err" >> $job_script
   echo "#SBATCH --time=24:00:00" >> $job_script
   # echo "#SBATCH --partition=<your_partition>" >> $job_script
   echo "#SBATCH --nodes=1" >> $job_script
   echo "#SBATCH --ntasks-per-node=8" >> $job_script
-  echo "#SBATCH --mem-per-cpu=16G" >> $job_script
-  echo "python $python_script $img_path  $output_dir $voxel_size $smoothing_iters $erosion_iters $dilation_iters $combined_mesh $labels_to_convert >> $job_script
+  echo "#SBATCH --mem-per-cpu=8G" >> $job_script
+  echo "python $python_script $img_path $out_dir $voxel_size $smoothing_iters $erosion_iters $dilation_iters $combined_mesh $labels_to_convert" >> $job_script
 
   # Submit the job script
   sbatch $job_script

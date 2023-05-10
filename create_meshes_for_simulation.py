@@ -307,14 +307,14 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Convert cells from labels to meshes in .vtk format")
     
-    parser.add_argument("img_path", type=str, help="Path to the labeled image", required=True)
-    parser.add_argument("output_dir", type=str, required=True,
+    parser.add_argument("img_path", type=str, help="Path to the labeled image")
+    parser.add_argument("output_dir", type=str,
                         help="Name of the folder where the processed labels, cell_meshes, and filtered_cell_meshes will be saved (default: 'output')")
-    parser.add_argument("voxel_size", type=float, nargs=3, required=True, help="Image resolution in microns (x, y, z)")
+    parser.add_argument("voxel_size", type=float, nargs=3, help="Image resolution in microns (x, y, z)")
     parser.add_argument("--dilation_iters", type=int, default=2, help="Number of iterations for dilation during label extension (default: 2)")
     parser.add_argument("--erosion_iters", type=int, default=1, help="Number of iterations for erosion during label extension (default: 1)")
     parser.add_argument("--smoothing_iters", type=int, default=5, help="Number of smoothing iterations applied to the mesh (default: 5)")
-    parser.add_argument("--combined_mesh", type=bool, default=True, action='store_true', 
+    parser.add_argument("--combined_mesh", default=True, action='store_true', 
                         help="If true the combined mesh of all the labels to convert is made.")
     parser.add_argument("--labels_to_convert", nargs="+", default="all", help="Either 'all', or a list of the labels to be converted")
     
