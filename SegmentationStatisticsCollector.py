@@ -14,7 +14,7 @@ import concurrent.futures
 import gc
 import matplotlib.pyplot as plt
 import seaborn as sns
-
+import pyclesperanto_prototype as cle
 
 """
     The methods in this script gather statistics from the 3D segmented labeled images. 
@@ -41,15 +41,12 @@ def remove_unconnected_regions(labeled_img, pad_width=10):
     """
     
     unique_labels = np.unique(labeled_img)
-    
-    # Pad the labeled image
-    padded_labeled_img = np.pad(labeled_img, pad_width=pad_width, mode='constant', constant_values=0)
-    filtered_labeled_img = padded_labeled_img.copy()
+    filtered_labeled_img = labeled_img.copy()
 
     for label in tqdm(unique_labels, desc='Removing unconnected regions'):
         if label == 0:
             continue
-        binary_mask = (padded_labeled_img == label).astype(np.uint8)
+        binary_mask = (filtered_labeled_img == label).astype(np.uint8)
 
         # Label connected regions
         labeled_mask, num_features = ndimage.label(binary_mask)
@@ -63,6 +60,45 @@ def remove_unconnected_regions(labeled_img, pad_width=10):
 
 
     return filtered_labeled_img
+
+# def remove_unconnected_regions(label_img_ar):
+#     """
+#     Some of the labels are not entirely connected in space. This scripts find the voxels that 
+#     belong to different regions of the cell label and then only keep the voxels that belong to 
+#     the biggest region. Could be done manually but this script saves a lot of time
+
+#     Parameters:
+#     ------------
+
+#     label_img_ar (np.array):
+#         The image of the cell labels.
+
+#     Returns:
+#     label_img_ar (np.array):
+#         The image of the cell labels where the unconnected regions have been removed.
+#     """
+    
+#     #Loop over the labels in the image
+#     for label_id in np.unique(label_img_ar):
+#         if label_id == 0: continue #The 0 label is for the background
+
+#         #Only select the part of the image that corresponds to the cell label
+#         masked_ar = np.ma.masked_where(label_img_ar == label_id, label_img_ar).mask.astype(int)
+
+#         #Check if they are different regions of the cell label
+#         labels_out = cc3d.connected_components(masked_ar, connectivity= 6)
+#         unique_labels, label_counts = np.unique(labels_out, return_counts = True)
+
+#         #Select the cell lable (!= 0) that has the most voxels
+#         max_label = unique_labels[np.argmax(label_counts[1:]) + 1]
+
+#         #Select all the voxels that do not belong to the biggest region of the cell label
+#         voxel_to_remove = np.argwhere((labels_out != max_label) & (labels_out != 0))
+
+#         #Remove the voxels that do not belong to the biggest region of the cell label in the orginal image
+#         label_img_ar[voxel_to_remove[:,0], voxel_to_remove[:,1], voxel_to_remove[:,2]] = 0
+
+#     return label_img_ar
 #------------------------------------------------------------------------------------------------------------
 
 
@@ -70,10 +106,9 @@ def remove_unconnected_regions(labeled_img, pad_width=10):
 
 
 #------------------------------------------------------------------------------------------------------------
-
-def remove_labels_touching_background(labeled_img):
+def remove_labels_touching_background(labeled_img, threshold=10):
     """
-    Remove all labels that are touching the label 0 (background) from the input labeled image.
+    Remove all labels that touch the background (label 0) more than the specified threshold.
 
     Parameters:
     -----------
@@ -81,10 +116,13 @@ def remove_labels_touching_background(labeled_img):
         The input 3D labeled image, where the background has a label of 0 and other objects have 
         positive integer labels.
 
+    threshold: int (default: 10)
+        The minimum number of background pixels a label must touch to be removed.
+
     Returns:
     --------
     filtered_labeled_img: (np.array, 3D)
-        The filtered 3D labeled image, where labels that were touching the background have been removed.
+        The filtered 3D labeled image, where labels touching the background more than the threshold have been removed.
     """
     # Find the unique labels in the labeled image
     unique_labels = np.unique(labeled_img)
@@ -106,9 +144,12 @@ def remove_labels_touching_background(labeled_img):
         # Find the border by XOR operation between the dilated and original binary images
         border_binary_img = dilated_binary_img ^ binary_img
 
-        # Check if the border is touching the background (label 0)
-        if np.any(padded_labeled_img[border_binary_img] == 0):
-            # If it's touching the background, remove the label from the filtered padded labeled image
+        # Count the number of background pixels (label 0) touching the border
+        background_touch_count = np.sum(padded_labeled_img[border_binary_img] == 0)
+
+        # Check if the background touch count is greater than or equal to the threshold
+        if background_touch_count >= threshold:
+            # If so, remove the label from the filtered padded labeled image
             filtered_padded_labeled_img[binary_img] = 0
     
     # Unpad the filtered labeled image to restore its original shape
@@ -116,6 +157,9 @@ def remove_labels_touching_background(labeled_img):
 
     return filtered_labeled_img
 #------------------------------------------------------------------------------------------------------------
+
+
+
 
 
 #------------------------------------------------------------------------------------------------------------
@@ -156,7 +200,7 @@ def renumber_labels(labeled_img):
 
 
 #------------------------------------------------------------------------------------------------------------
-def extend_labels(labeled_img, erosion_iterations=1, dilation_iterations=2):
+def extend_labels(labeled_img, erosion_iterations=1, dilation_iterations=2, radius = 5):
     """
     Extends the labels in a 3D labeled image to ensure that they touch one another.
 
@@ -178,10 +222,15 @@ def extend_labels(labeled_img, erosion_iterations=1, dilation_iterations=2):
     
     unique_labels = np.unique(labeled_img)
     extended_labeled_img = labeled_img.copy()
-
-    for label in tqdm(unique_labels, desc='Extending labels'):
+    
+    # Flood fill the gaps between labels
+    extended_labeled_img = np.asarray(cle.closing_labels(extended_labeled_img, radius=radius))
+    
+    for label in unique_labels:
         if label == 0:
             continue
+        
+        # Get the binary mask for the current label
         binary_mask = (labeled_img == label).astype(np.uint8)
 
         # Erode the binary mask first
@@ -206,7 +255,6 @@ def convert_cell_labels_to_meshes(
     img,
     voxel_resolution,
     smoothing_iterations=1,
-    preprocess=False,
     output_directory='output',
     overwrite=False,
     pad_width=10
@@ -247,8 +295,8 @@ def convert_cell_labels_to_meshes(
     img_padded = np.pad(img, pad_width=pad_width, mode='constant', constant_values=0)
 
     mesh_lst = []
-    label_ids = np.unique(img)
-
+    label_ids = np.unique(img_padded)
+    
     meshes_folder = os.path.join(output_directory, 'cell_meshes')
     if not os.path.exists(meshes_folder):
         os.makedirs(meshes_folder)
@@ -264,7 +312,7 @@ def convert_cell_labels_to_meshes(
             points = (points - np.array([pad_width, pad_width, pad_width])) * voxel_resolution
 
             cell_surface_mesh = tm.Trimesh(points, faces)
-            cell_surface_mesh = tm.smoothing.filter_laplacian(cell_surface_mesh, iterations=smoothing_iterations)
+            cell_surface_mesh = tm.smoothing.filter_mut_dif_laplacian(cell_surface_mesh, iterations=smoothing_iterations, lamb=0.5)
         else:
             cell_surface_mesh = tm.load_mesh(cell_mesh_file)
 
@@ -438,7 +486,7 @@ def compute_cell_contact_area_fraction(cell_mesh_lst, cell_id, cell_neighbors_ls
 
 
     # Keep track of all the faces of the given cell that are in contact with other cells
-    contact_faces = []
+    contact_faces = set()
 
     cell_mesh = cell_mesh_lst[cell_id - 1]
     assert (isinstance(cell_mesh, tm.Trimesh))
@@ -451,20 +499,16 @@ def compute_cell_contact_area_fraction(cell_mesh_lst, cell_id, cell_neighbors_ls
 
         # Get the indices of the triangles whose centroids are located at distances shorter than the cutoff distance from the neighbor cell surface
         lateral_triangle_id = np.where(distance <= contact_cutoff)[0]
-        contact_faces.append(lateral_triangle_id)
+        contact_faces.update(lateral_triangle_id)
 
     # Create a unique list of faces that are in contact with other cells
-    contact_faces = np.unique(np.concatenate(contact_faces))
+    contact_faces = np.array(list(contact_faces))
 
     # sum the area of all the faces that are in contact with other cells
-    contact_area = np.sum(cell_mesh_lst[cell_id - 1].area_faces[contact_faces])
-
-    # store all the contact faces in a mesh
-    #contact_mesh = tm.Trimesh(cell_mesh_lst[cell_id - 1].vertices, cell_mesh_lst[cell_id - 1].faces[contact_faces])
-    #contact_mesh.export('contact_mesh.stl')
+    contact_area = np.sum(cell_mesh.area_faces[contact_faces])
 
     # Calculate the fraction of contact area
-    contact_fraction = contact_area / cell_mesh_lst[cell_id - 1].area
+    contact_fraction = contact_area / cell_mesh.area
 
     return contact_fraction
 #------------------------------------------------------------------------------------------------------------
@@ -509,7 +553,8 @@ def process_labels(labeled_img, erosion_iterations=1, dilation_iterations=2, out
         preprocessed_labels = np.load(processed_labels_file)
     else:
         # Generate processed_labels
-        unconnected_labels = remove_unconnected_regions(labeled_img, pad_width=10)
+        labeled_img = np.pad(labeled_img, 10, mode='constant', constant_values=0)
+        unconnected_labels = remove_unconnected_regions(labeled_img)
         renumbered_labeled_img = renumber_labels(unconnected_labels)
         preprocessed_labels = extend_labels(renumbered_labeled_img, erosion_iterations=erosion_iterations, dilation_iterations=dilation_iterations)
         #  Remove the padding:
@@ -679,7 +724,6 @@ def generate_plots(input_data, columns_to_plot=None, plot_type='violin', output_
 
     # Close all figures to release memory
     plt.close('all')
-
 #------------------------------------------------------------------------------------------------------------
 
 
@@ -691,7 +735,7 @@ def collect_cell_morphological_statistics(labeled_img, img_resolution, contact_c
                                           smoothing_iterations=5, erosion_iterations=1, dilation_iterations=2,
                                           output_folder='output', meshes_only=False, overwrite=False, preprocess=True, 
                                           max_workers=None, calculate_contact_area_fraction = False, plot=None, plot_type='violin',
-                                          *args, **kwargs) -> pd.DataFrame:
+                                          volume_threshold=200, *args, **kwargs) -> pd.DataFrame:
     """
     Collect the following statistics about the cells:
         - cell_areas
@@ -807,19 +851,29 @@ def collect_cell_morphological_statistics(labeled_img, img_resolution, contact_c
     assert(np.all(cell_id_lst == np.arange(1, len(cell_id_lst) + 1)))
 
     # Convert the cell labels to meshes
-    mesh_lst = convert_cell_labels_to_meshes(preprocessed_labels, img_resolution, output_directory=output_directory, smoothing_iterations=smoothing_iterations,
-                                             preprocess=preprocess)
+    mesh_lst = convert_cell_labels_to_meshes(preprocessed_labels, img_resolution, output_directory=output_directory, 
+                                            smoothing_iterations=smoothing_iterations, overwrite=overwrite)
 
+    # Get the cell volumes
+    cell_volumes = compute_cell_volumes(mesh_lst)
+    
     # Check if filtered_labeled_img exists, and load it if it does
     filtered_labeled_img_path = os.path.join(output_directory, 'filtered_labeled_img.npy')
-    if os.path.isfile(filtered_labeled_img_path):
+    if os.path.isfile(filtered_labeled_img_path) and not overwrite:
         filtered_labeled_img = np.load(filtered_labeled_img_path)
     else:
         # Remove the cells that are touching the background, leaving all the "inner" cells
-        filtered_labeled_img = remove_labels_touching_background(preprocessed_labels)
+        filtered_labeled_img = remove_labels_touching_background(preprocessed_labels, threshold=1)
+        
+        # Exclude cells with volumes below the volume threshold
+        if volume_threshold is not None:
+            cell_volumes_np = np.array(cell_volumes)
+            cells_above_threshold = np.where(cell_volumes_np >= volume_threshold)[0] + 1
+            filtered_labeled_img = np.where(np.isin(filtered_labeled_img, cells_above_threshold), 
+                                            filtered_labeled_img, 0)
+        
         np.save(filtered_labeled_img_path, filtered_labeled_img)
-    
-    
+        
     filtered_cell_id_lst = np.unique(filtered_labeled_img)[1:]
 
     # Save the meshes
@@ -830,9 +884,6 @@ def collect_cell_morphological_statistics(labeled_img, img_resolution, contact_c
     
     # Get the cell areas
     cell_areas = compute_cell_areas(mesh_lst)
-
-    # Get the cell volumes
-    cell_volumes = compute_cell_volumes(mesh_lst)
 
     # Compute the isoperimetric ratio of each cell
     cell_isoperimetric_ratio = [(area**3) / (volume**2) for area, volume in zip(cell_areas, cell_volumes)]
@@ -951,10 +1002,10 @@ if __name__ == "__main__":
         nb_x_voxels=200,
         nb_y_voxels=200,
         nb_z_voxels=200,
-        cube_side_length=5,
-        nb_cubes_x=2,
-        nb_cubes_y=2,
-        nb_cubes_z=2,
+        cube_side_length=30,
+        nb_cubes_x=5,
+        nb_cubes_y=5,
+        nb_cubes_z=5,
         interstitial_space=-1,
     )
 
@@ -967,14 +1018,16 @@ if __name__ == "__main__":
     
     #Collect the statistics of the cells
     
-    # cell_statistics_df = collect_cell_morphological_statistics(img, np.array([0.21, 0.21, 0.39]), contact_cutoff = 0.8, clear_meshes_folder=False, output_folder="/Users/antanas/BC_Project/Control_Segmentation/BC_control", meshes_only=False, overwrite=False,
-    #                                                            smoothing_iterations=5, erosion_iterations=2, dilation_iterations=3)
+    cell_statistics_df = collect_cell_morphological_statistics(img, np.array([0.21, 0.21, 0.39]), contact_cutoff = 0.8, clear_meshes_folder=True, output_folder="/Users/antanas/BC_Project/Control_Segmentation/BC_control_2", meshes_only=False, overwrite=True,
+                                                               smoothing_iterations=5, erosion_iterations=2, dilation_iterations=3, calculate_contact_area_fraction=False, plot = 'all', plot_type = 'violin', preprocess = True)
     
-    cell_statistics_df = collect_cell_morphological_statistics(img, np.array([0.21, 0.21, 0.39]), contact_cutoff = 0.2, clear_meshes_folder=True, output_folder="Cube_test", preprocess = False, meshes_only=False, overwrite=True,
-                                                              smoothing_iterations=5, erosion_iterations=2, dilation_iterations=3, max_workers=4, calculate_contact_area_fraction=True, plot = 'all', plot_type = 'violin')
+    # cell_statistics_df = collect_cell_morphological_statistics(labeled_img='/Users/antanas/Downloads/relabeled/cell_boundary_time_5_relabeled.tif', img_resolution = np.array([0.21, 0.21, 0.39]), contact_cutoff = 0.2, clear_meshes_folder=True, output_folder="Cube_test", preprocess = False, meshes_only=False, overwrite=True,
+    #                                                           smoothing_iterations=5, erosion_iterations=2, dilation_iterations=3, max_workers=4, calculate_contact_area_fraction=True, plot = 'all', plot_type = 'violin')
     # print(cell_statistics_df)
     # generate_plots(input_data = '/Users/antanas/GitRepo/EpiStats/all_cell_statistics.csv', plot_type='violin')
     
-    cell_statistics_df = collect_cell_morphological_statistics(labeled_img = 'path to .tif or 3D array of your image', img_resolution = np.array([0.21, 0.21, 0.39]), contact_cutoff = 0.2, clear_meshes_folder=True, 
-                                                                output_folder="Cube_test", preprocess = False, meshes_only=False, overwrite=True, 
-                                                                max_workers=4, calculate_contact_area_fraction=True, plot = 'all', plot_type = 'violin')
+    # cell_statistics_df = collect_cell_morphological_statistics(labeled_img = 'path to .tif or 3D array of your image', img_resolution = np.array([0.21, 0.21, 0.39]), contact_cutoff = 0.2, clear_meshes_folder=True, 
+    #                                                             output_folder="Cube_test", preprocess = False, meshes_only=False, overwrite=True, 
+    #                                                             max_workers=4, calculate_contact_area_fraction=True, plot = 'all', plot_type = 'violin')
+    
+    # generate_plots(input_data = '/Users/antanas/BC_Project/Control_Segmentation_final/BC_control_2_s_8_e_3_d_4/filtered_cell_statistics.csv', plot_type='violin')
