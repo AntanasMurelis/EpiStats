@@ -148,9 +148,9 @@ def create_vtk_file(mesh_dir, statistics_csv, statistic_column, output_vtk):
 
 if __name__ == '__main__':
     # Replace these with the appropriate paths
-    mesh_dir = '/Users/antanas/BC_Project/Control_Segmentation_final/BC_control_2_s_8_e_3_d_4/cell_meshes'
-    statistics_csv = '/Users/antanas/BC_Project/Control_Segmentation_final/BC_control_2_s_8_e_3_d_4/filtered_cell_statistics.csv'
+    mesh_dir = '/Users/antanas/BC_Project/Control_Segmentation_final/Total_meshes/Validated_labels_final_Franzi_11w_s_10_e_2_d_3/cell_meshes'
+    statistics_csv = '/Users/antanas/BC_Project/Control_Segmentation_final/Total_meshes/Validated_labels_final_Franzi_11w_s_10_e_2_d_3/all_cell_statistics.csv'
     statistic_column = 'cell_volume'
 
     #visualize_statistics(mesh_dir, statistics_csv, statistic_column)
-    create_vtk_file(mesh_dir, statistics_csv, statistic_column, '/Users/antanas/BC_Project/Control_Segmentation_final/BC_control_2_s_8_e_3_d_4/vtk_meshes.vtk')
+    create_vtk_file(mesh_dir, statistics_csv, statistic_column, '/Users/antanas/BC_Project/Control_Segmentation_final/BC_control_2_s_8_e_3_d_4/vtk_meshes_11w_all.vtk')
