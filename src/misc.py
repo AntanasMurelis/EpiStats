@@ -42,3 +42,11 @@ def create_output_directory(output_folder: str, smoothing_iterations: int, erosi
         os.makedirs(output_directory)
     return output_directory
 #------------------------------------------------------------------------------------------------------------
+
+
+#------------------------------------------------------------------------------------------------------------
+def custom_showwarning(message, category, filename, lineno, file=None, line=None):
+    '''
+    When printing a warning suppress everything except for the message and the category of the warning.
+    '''
+    print(f"{category.__name__}: {message}")

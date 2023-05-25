@@ -4,8 +4,9 @@ import scipy.ndimage as ndimage
 from skimage.measure import regionprops
 import trimesh as tm
 import os
+import warnings
 from napari_process_points_and_surfaces import label_to_surface
-from misc import load_labeled_img, create_output_directory
+from misc import load_labeled_img, create_output_directory, custom_showwarning
 
 
 
@@ -17,7 +18,7 @@ from misc import load_labeled_img, create_output_directory
 # Naive implementation
 #######################################################################################################################
 
-def remove_unconnected_regions(labeled_img, pad_width=10):
+def remove_unconnected_regions(labeled_img, warning_size_threshold=0.1):
     """
     Removes regions of labels that are not connected to the main cell body.
 
@@ -27,14 +28,16 @@ def remove_unconnected_regions(labeled_img, pad_width=10):
         A 3D labeled image where the background has a label of 0 and cells are labeled with 
         consecutive integers starting from 1.
 
-    padding: (int, optional, default=1)
-        The number of pixels to pad the labeled image along each axis.
+    warning_size_threshold: (float, optional, default=0.1)
+        Return a warning if the relative size of a removed region is greter than this threshold.
 
     Returns:
     --------
     filtered_labeled_img: (np.array, 3D)
         A 3D labeled image with unconnected regions removed.
     """
+
+    warnings.showwarning = custom_showwarning
     
     unique_labels = np.unique(labeled_img)
     filtered_labeled_img = labeled_img.copy()
@@ -50,8 +53,12 @@ def remove_unconnected_regions(labeled_img, pad_width=10):
         # Remove unconnected regions
         if num_features > 1:
             region_sizes = ndimage.sum(binary_mask, labeled_mask, range(num_features + 1))
+            relative_region_sizes = region_sizes / np.max(region_sizes)
+            num_regions_over_threshold = np.sum(relative_region_sizes > warning_size_threshold) - 1
+            if num_regions_over_threshold: 
+                warnings.warn(f'Removing {num_regions_over_threshold} large regions with label {label} with threshold set at {warning_size_threshold}.')
             largest_region_label = np.argmax(region_sizes[1:]) + 1
-            filtered_region = labeled_mask == largest_region_label
+            filtered_region = (labeled_mask == largest_region_label).astype(np.int8) * largest_region_label
             filtered_labeled_img[labeled_mask != filtered_region] = 0
 
 
