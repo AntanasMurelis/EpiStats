@@ -1,0 +1,94 @@
+import os
+import json
+import subprocess
+from typing import Optional
+
+#-----------------------------------------------------------------------------
+def create_slurm(
+        config_file, 
+        name: str,
+        jobs_dir: Optional[str] = './jobs'
+    ) -> str:
+    '''
+    Create a bash script to run the training on cluster.
+
+    Parameters:
+    -----------
+        config_file: (str)
+            The path to the config file to use for the current run.    
+        idx: (str)
+            A string naming the current config file.
+
+    Returns:
+    --------
+        script_file: (str)
+            The path to the bash file to execute.
+    '''
+
+    bash_script = f"""\
+#!/bin/bash
+
+#SBATCH -n 1
+#SBATCH --cpus-per-task=8
+#SBATCH --time=12:00:00
+#SBATCH --mem-per-cpu=10240
+
+python run.py --config {config_file}   
+    """
+
+    script_file = f'submit_training_{name}.sh'
+
+    save_script_dir = jobs_dir
+    if not os.path.exists(save_script_dir):
+        os.makedirs(save_script_dir)
+    with open(os.path.join(save_script_dir, script_file), 'w') as file:
+        file.write(bash_script)
+
+    return os.path.join(save_script_dir, script_file)
+#-----------------------------------------------------------------------------
+
+
+#Read the config.json file
+with open("config.json", "r") as file:
+    curr_config = json.load(file)
+
+#Set ranges of parameters to modify in the config
+tissues = ['intestine_villus', 'lung_bronchiole', 'bladder', 'bladder', 'bladder', 'bladder']
+voxel_sizes = [
+    [0.21, 0.21, 0.39],
+    [0.325, 0.325, 0.25],
+    [0.1625, 0.1625, 0.25],
+    [0.1625, 0.1625, 0.25],
+    [0.1625, 0.1625, 0.25],
+    [0.1625, 0.1625, 0.25]
+]
+COMMON_ROOT = '/nas/groups/iber/Users/Federico_Carrara/create_meshes/data/curated_labels/'
+input_files = [
+    'intestine_sample2_b_curated_segmentation_relabel_seq.tif',
+    'lung_new_sample_b_curated_segmentation_central_crop_relabel_seq.tif',
+    'MBC19_S5_St1_Crop_GFP_clean_bottom.tif',
+    'MBC19_S5_St1_Crop_GFP_clean_top.tif',
+    'MBC20_S1e_0a_St2_GFP_clean_bottom.tif',
+    'MBC20_S1e_0a_St2_GFP_clean_top.tif'
+]
+input_paths = [os.path.join(COMMON_ROOT, input_file) for input_file in input_files]
+
+#For each tissue create a new config file and a new job submit script
+for tissue, voxel_size, input_path in zip(tissues, voxel_sizes ,input_paths):
+    #update config file
+    curr_config["tissue"] = tissue
+    curr_config["voxel_size"] = voxel_size
+    curr_config["input_path"] = input_path
+    
+    #save the new config dictionary
+    save_config_dir = './configs'
+    if not os.path.exists(save_config_dir):
+        os.makedirs(save_config_dir)
+    with open(os.path.join(save_config_dir, f"config_{tissue}.json"), "w") as f_out:
+        json.dump(curr_config, f_out)
+    
+    #call a function to create a slurm script 
+    path_to_job_script = create_slurm(os.path.join(save_config_dir, f"config_{tissue}.json"), tissue)
+    
+    #execute the created job  
+    subprocess.run(['sbatch', path_to_job_script], stdin=subprocess.PIPE)
