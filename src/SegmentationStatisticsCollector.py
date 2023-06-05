@@ -1436,13 +1436,5 @@ if __name__ == "__main__":
     # cell_statistics_df = collect_cell_morphological_statistics(img, np.array([0.236, 0.236, 0.487]), contact_cutoff = 0.5, output_folder="/Users/antanas/BC_Project/Control_Segmentation/Maoxia_10", meshes_only=False, overwrite=True,
     #                                                            smoothing_iterations=4, erosion_iterations=2, dilation_iterations=3, calculate_contact_area_fraction=True, plot = 'all', plot_type = 'violin', preprocess = True, max_workers=None, volume_lower_threshold=200, volume_upper_threshold=5000)
     
-    cell_statistics_df = collect_cell_morphological_statistics(labeled_img=img, img_resolution = np.array([0.21, 0.21, 0.39]), contact_cutoff = 0.7, clear_meshes_folder=False, output_folder="./Test_1000", preprocess = True, meshes_only=False, overwrite=True,
+    cell_statistics_df = collect_cell_morphological_statistics(labeled_img=img, img_resolution = np.array([0.21, 0.21, 0.39]), contact_cutoff = 0.7, clear_meshes_folder=False, output_folder="./Test_1000", preprocess = True, meshes_only=False, overwrite=False,
                                                               smoothing_iterations=5, erosion_iterations=2, dilation_iterations=5, max_workers=4, calculate_contact_area_fraction=True, plot = 'all', plot_type = 'violin', volume_lower_threshold=None, volume_upper_threshold=None)
-    # print(cell_statistics_df)
-    # generate_plots(input_data = '/Users/antanas/GitRepo/EpiStats/all_cell_statistics.csv', plot_type='violin')
-    
-    # cell_statistics_df = collect_cell_morphological_statistics(labeled_img = 'path to .tif or 3D array of your image', img_resolution = np.array([0.21, 0.21, 0.39]), contact_cutoff = 0.2, clear_meshes_folder=True, 
-    #                                                             output_folder="Cube_test", preprocess = False, meshes_only=False, overwrite=True, 
-    #                                                             max_workers=4, calculate_contact_area_fraction=True, plot = 'all', plot_type = 'violin')
-    
-    # generate_plots(input_data = '/Users/antanas/BC_Project/Control_Segmentation_final/BC_control_2_s_8_e_3_d_4/filtered_cell_statistics.csv', plot_type='violin')
