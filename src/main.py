@@ -1,29 +1,52 @@
+from Statistics import collect_cell_morphological_statistics
+import hydra
+from omegaconf import DictConfig
+import numpy as np
 from tests.CubeLatticeTest import *
 from tests.SphereTest import *
-from Statistics import collect_cell_morphological_statistics
 
-if __name__ == "__main__":
-    
-    # Test the mesh generation part by meshing of the test lattice cube images. 
-    img = generate_cube_lattice_image(
-        nb_x_voxels=200,
-        nb_y_voxels=200,
-        nb_z_voxels=200,
-        cube_side_length=5,
-        nb_cubes_x=5,
-        nb_cubes_y=5,
-        nb_cubes_z=5,
-        interstitial_space=-1,
+import warnings
+warnings.filterwarnings("ignore")
+
+@hydra.main(config_path="../conf", config_name="config.yml")
+def main(cfg: DictConfig) -> None:
+    labeled_img_path = cfg.labeled_img
+    img_resolution = np.array(cfg.img_resolution)
+    contact_cutoff = cfg.contact_cutoff
+    smoothing_iterations = cfg.smoothing_iterations
+    erosion_iterations = cfg.erosion_iterations
+    dilation_iterations = cfg.dilation_iterations
+    output_folder = cfg.output_folder
+    meshes_only = cfg.meshes_only
+    overwrite = cfg.overwrite
+    preprocess = cfg.preprocess
+    calculate_contact_area_fraction = cfg.calculate_contact_area_fraction
+    max_workers = cfg.max_workers
+    plot = cfg.plot
+    plot_type = cfg.plot_type
+    volume_lower_threshold = cfg.volume_lower_threshold
+    volume_upper_threshold = cfg.volume_upper_threshold
+
+
+    # Call the function with the parameters
+    collect_cell_morphological_statistics(
+        labeled_img=labeled_img_path,
+        img_resolution=img_resolution,
+        contact_cutoff=contact_cutoff,
+        smoothing_iterations=smoothing_iterations,
+        erosion_iterations=erosion_iterations,
+        dilation_iterations=dilation_iterations,
+        output_folder=output_folder,
+        meshes_only=meshes_only,
+        overwrite=overwrite,
+        preprocess=preprocess,
+        max_workers=max_workers,
+        calculate_contact_area_fraction=calculate_contact_area_fraction,
+        plot=plot,
+        plot_type=plot_type,
+        volume_lower_threshold=volume_lower_threshold,
+        volume_upper_threshold=volume_upper_threshold
     )
 
-    
-    # img = "/Users/antanas/Downloads/relabeled/cell_boundary_time_10_relabeled.tif"
-    
-
-    cell_statistics_df = collect_cell_morphological_statistics(labeled_img=img, img_resolution = np.array([0.21, 0.21, 0.39]), contact_cutoff = 0.6, clear_meshes_folder=False, output_folder="./Test_1000", preprocess = True, meshes_only=False, overwrite=True,
-                                                              smoothing_iterations=5, erosion_iterations=2, dilation_iterations=5, max_workers=10, calculate_contact_area_fraction=True, plot = 'all', plot_type = 'violin', volume_lower_threshold=5, volume_upper_threshold=5000)
-
-    # cell_statistics_df = collect_cell_morphological_statistics(labeled_img = 'path to .tif or 3D array of your image', img_resolution = np.array([0.21, 0.21, 0.39]), contact_cutoff = 0.2, clear_meshes_folder=True, 
-    #                                                             output_folder="Cube_test", preprocess = False, meshes_only=False, overwrite=True, 
-    #                                                             max_workers=4, calculate_contact_area_fraction=True, plot = 'all', plot_type = 'violin')
-    
+if __name__ == "__main__":
+    main()

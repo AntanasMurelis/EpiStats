@@ -1,7 +1,6 @@
 import numpy as np
 from skimage import io
 import os
-import pyclesperanto_prototype as cle
 from typing import Union
 
 #------------------------------------------------------------------------------------------------------------
@@ -16,8 +15,11 @@ def load_labeled_img(labeled_img: Union[str, np.ndarray]):
         labeled_img: The loaded labeled image.
     """
     if isinstance(labeled_img, str) and os.path.isfile(labeled_img):
-        labels = io.imread(labeled_img)
-        labeled_img = np.einsum('kij->ijk', labels)
+        if labeled_img.endswith('.npy'):
+            labeled_img = np.load(labeled_img)
+        else:
+            labeled_img = io.imread(labeled_img)
+            labeled_img = np.einsum('kij->ijk', labeled_img)
     return labeled_img
 #------------------------------------------------------------------------------------------------------------
 

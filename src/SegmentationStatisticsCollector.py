@@ -16,7 +16,8 @@ import seaborn as sns
 import pyclesperanto_prototype as cle
 from typing import Union, Optional
 from pykdtree.kdtree import KDTree
-import napari
+
+
 
 """
     The methods in this script gather statistics from the 3D segmented labeled images. 
@@ -37,6 +38,14 @@ class ExtendedTrimesh(trimesh.Trimesh):
             dist, idx = self.my_kdtree.query(centroid)
             if dist < distance:
                 potential_contact_faces.append(face_index)
+        
+        
+        # with napari.gui_qt():
+        #     viewer = napari.Viewer()
+        #     viewer.add_surface((self.vertices, self.faces), name='neighbor')
+        #     viewer.add_surface((other_mesh.vertices, other_mesh.faces[potential_contact_faces]), colormap='red', name='contact_faces')
+        #     viewer.add_surface((other_mesh.vertices, other_mesh.faces), name='target')
+            
         return potential_contact_faces
 
     def calculate_contact_area(self, other_mesh, distance):
@@ -44,6 +53,12 @@ class ExtendedTrimesh(trimesh.Trimesh):
         # Assuming contact area is just the sum of the areas of the contact faces
         contact_area = np.sum(other_mesh.area_faces[contact_faces_indices])
         return contact_area
+    
+#------------------------------------------------------------------------------------------------------------
+    
+    
+    
+    
     
 #------------------------------------------------------------------------------------------------------------
 def remove_unconnected_regions(labeled_img, pad_width=10):
@@ -81,9 +96,15 @@ def remove_unconnected_regions(labeled_img, pad_width=10):
             region_sizes = ndimage.sum(binary_mask, labeled_mask, range(num_features + 1))
             largest_region_label = np.argmax(region_sizes[1:]) + 1
             filtered_region = labeled_mask == largest_region_label
-            filtered_labeled_img[labeled_mask != filtered_region] = 0
+            filtered_labeled_img[binary_mask != filtered_region] = 0
 
     return filtered_labeled_img
+
+
+
+
+
+
 
 # def remove_unconnected_regions(label_img_ar):
 #     """
@@ -181,7 +202,7 @@ def remove_unconnected_regions(labeled_img, pad_width=10):
 
 #     return filtered_labeled_img
 
-from skimage.measure import label, regionprops
+from skimage.measure import regionprops
 
 def remove_labels_touching_edges(labeled_img):
     """
@@ -198,8 +219,7 @@ def remove_labels_touching_edges(labeled_img):
     filtered_labeled_img: (np.array, 3D)
         The filtered 3D labeled image, where labels touching the edges have been removed.
     """
-    viewer = napari.Viewer()
-    viewer.add_labels(labeled_img)
+
     # Create a copy of the labeled image to store the filtered output
     filtered_labeled_img = labeled_img.copy()
 
@@ -218,9 +238,7 @@ def remove_labels_touching_edges(labeled_img):
         if (min_slice == 0 or minr == 0 or minc == 0 or max_slice == image_shape[0] or maxr == image_shape[1] or maxc == image_shape[2]):
             # If so, remove the label from the filtered labeled image
             filtered_labeled_img[labeled_img == region.label] = 0
-            
-    viewer.add_labels(filtered_labeled_img)
-    
+                
     return filtered_labeled_img
 #------------------------------------------------------------------------------------------------------------
 
@@ -528,6 +546,52 @@ def compute_cell_principal_axis_and_elongation(cell_mesh):
 
 
 #------------------------------------------------------------------------------------------------------------
+# def compute_cell_contact_area_fraction(cell_mesh_lst, cell_id, cell_neighbors_lst, contact_cutoff):
+#     """
+#     Compute the fraction of the cell surface area which is in contact with other cells.
+    
+#     Parameters:
+#     -----------
+#     cell_mesh_lst: (list, ExtendedTrimesh)
+#         List of the cell meshes in the ExtendedTrimesh format
+#     cell_id: (int)
+#         The id of the cell for which we want to calculate the contact area fraction
+#     cell_neighbors_lst: (list, int)
+#         List of the ids of the neighbors of the cell
+#     contact_cutoff: (float)
+#         The cutoff distance in microns for two cells to be considered in contact
+
+#     Returns
+#     -------
+#         contact_fraction: (float)
+#         contact_area_distribution: (list of float)
+#         mean_contact_area: (float)
+#     """
+    
+#     if cell_neighbors_lst.__len__() == 0:
+#         return 0, [], 0
+
+#     cell_mesh = cell_mesh_lst[cell_id - 1]
+#     cell_mesh = ExtendedTrimesh(cell_mesh.vertices, cell_mesh.faces)
+    
+#     contact_area_total = 0
+#     contact_area_distribution = []
+#     # Loop over the neighbors of the cell
+#     for neighbor_id in cell_neighbors_lst:
+#         # Get potential contact faces using the get_potential_contact_faces method from ExtendedTrimesh class
+#         neighbour_mesh = cell_mesh_lst[neighbor_id - 1]
+#         contact_area = cell_mesh.calculate_contact_area(neighbour_mesh, contact_cutoff)
+#         contact_area_total += contact_area
+#         contact_area_distribution.append(contact_area)
+
+#     # Calculate the fraction of contact area
+#     contact_fraction = contact_area_total / cell_mesh.area
+
+#     # Calculate the mean of contact area
+#     mean_contact_area = np.mean(contact_area_distribution)
+
+#     return contact_fraction, contact_area_distribution, mean_contact_area
+
 def compute_cell_contact_area_fraction(cell_mesh_lst, cell_id, cell_neighbors_lst, contact_cutoff):
     """
     Compute the fraction of the cell surface area which is in contact with other cells.
@@ -550,29 +614,33 @@ def compute_cell_contact_area_fraction(cell_mesh_lst, cell_id, cell_neighbors_ls
         mean_contact_area: (float)
     """
     
-    if cell_neighbors_lst.__len__() == 0:
+    if len(cell_neighbors_lst) == 0:
         return 0, [], 0
 
     cell_mesh = cell_mesh_lst[cell_id - 1]
     cell_mesh = ExtendedTrimesh(cell_mesh.vertices, cell_mesh.faces)
     
-    contact_area_total = 0
+    contact_face_indices = set()
     contact_area_distribution = []
     # Loop over the neighbors of the cell
     for neighbor_id in cell_neighbors_lst:
         # Get potential contact faces using the get_potential_contact_faces method from ExtendedTrimesh class
         neighbour_mesh = cell_mesh_lst[neighbor_id - 1]
-        contact_area = cell_mesh.calculate_contact_area(neighbour_mesh, contact_cutoff)
-        contact_area_total += contact_area
-        contact_area_distribution.append(contact_area)
+        neighbour_mesh = ExtendedTrimesh(neighbour_mesh.vertices, neighbour_mesh.faces)
+        contact_faces = neighbour_mesh.get_potential_contact_faces(cell_mesh, contact_cutoff)
 
+        # Calculate contact area for the current neighbor and add to distribution
+        neighbor_contact_area = np.sum(neighbour_mesh.area_faces[contact_faces])
+        contact_area_distribution.append(neighbor_contact_area)
+        contact_face_indices.update(contact_faces)
+
+    # Calculate the contact area for unique faces only
+    contact_area_total = np.sum(cell_mesh.area_faces[list(contact_face_indices)])
+    
     # Calculate the fraction of contact area
     contact_fraction = contact_area_total / cell_mesh.area
 
-    # Calculate the mean of contact area
-    mean_contact_area = np.mean(contact_area_distribution)
-
-    return contact_fraction, contact_area_distribution, mean_contact_area
+    return contact_fraction, contact_area_distribution, np.mean(contact_area_distribution)
 #------------------------------------------------------------------------------------------------------------
 
 
@@ -826,11 +894,12 @@ def load_or_create_filtered_labels(preprocessed_labels: np.ndarray, cell_volumes
         filtered_labels = np.unique(filtered_label_image)[1:]
         
         # Filter based on volume thresholds
-        if volume_lower_threshold is not None or volume_upper_threshold is not None:
-            filtered_labels = np.array([label for label in filtered_labels if
-                                        (volume_lower_threshold is None or cell_volumes[label - 1] >= volume_lower_threshold) and
-                                        (volume_upper_threshold is None or cell_volumes[label - 1] <= volume_upper_threshold)])
-        
+    if volume_lower_threshold is not None or volume_upper_threshold is not None:
+        filtered_labels = np.array([
+            label for label in filtered_labels 
+            if (volume_lower_threshold is None or (volume_lower_threshold is not None and cell_volumes[label - 1] >= volume_lower_threshold)) 
+            and (volume_upper_threshold is None or (volume_upper_threshold is not None and cell_volumes[label - 1] <= volume_upper_threshold))
+    ])
         np.save(filtered_labels_path, filtered_labels)
     
     return filtered_labels
@@ -1368,7 +1437,7 @@ if __name__ == "__main__":
     #                                                            smoothing_iterations=4, erosion_iterations=2, dilation_iterations=3, calculate_contact_area_fraction=True, plot = 'all', plot_type = 'violin', preprocess = True, max_workers=None, volume_lower_threshold=200, volume_upper_threshold=5000)
     
     cell_statistics_df = collect_cell_morphological_statistics(labeled_img=img, img_resolution = np.array([0.21, 0.21, 0.39]), contact_cutoff = 0.7, clear_meshes_folder=False, output_folder="./Test_1000", preprocess = True, meshes_only=False, overwrite=True,
-                                                              smoothing_iterations=5, erosion_iterations=2, dilation_iterations=5, max_workers=4, calculate_contact_area_fraction=True, plot = 'all', plot_type = 'violin', volume_lower_threshold=5, volume_upper_threshold=5000)
+                                                              smoothing_iterations=5, erosion_iterations=2, dilation_iterations=5, max_workers=4, calculate_contact_area_fraction=True, plot = 'all', plot_type = 'violin', volume_lower_threshold=None, volume_upper_threshold=None)
     # print(cell_statistics_df)
     # generate_plots(input_data = '/Users/antanas/GitRepo/EpiStats/all_cell_statistics.csv', plot_type='violin')
     

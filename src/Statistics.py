@@ -11,6 +11,8 @@ import concurrent.futures
 from typing import Optional
 
 
+
+
 #------------------------------------------------------------------------------------------------------------
 def compute_cell_areas(cell_mesh_lst: list):
     """
@@ -188,8 +190,70 @@ def get_cell_principal_axis_and_elongation(mesh_lst, cell_id_lst):
 
 
 
+############################################################################################################
+# Implementation of the contact area fraction computation -- Old version
+# Benefit: more memory efficient
+# Drawback: Contact surface area fraction can go beyond 1
+############################################################################################################
+#------------------------------------------------------------------------------------------------------------
+# def compute_cell_contact_area_fraction(cell_mesh_lst, cell_id, cell_neighbors_lst, contact_cutoff):
+#     """
+#     Compute the fraction of the cell surface area which is in contact with other cells.
+    
+#     Parameters:
+#     -----------
+#     cell_mesh_lst: (list, ExtendedTrimesh)
+#         List of the cell meshes in the ExtendedTrimesh format
+#     cell_id: (int)
+#         The id of the cell for which we want to calculate the contact area fraction
+#     cell_neighbors_lst: (list, int)
+#         List of the ids of the neighbors of the cell
+#     contact_cutoff: (float)
+#         The cutoff distance in microns for two cells to be considered in contact
+
+#     Returns
+#     -------
+#         contact_fraction: (float)
+#         contact_area_distribution: (list of float)
+#         mean_contact_area: (float)
+#     """
+    
+#     if cell_neighbors_lst.__len__() == 0:
+#         return 0, [], 0
+
+#     cell_mesh = cell_mesh_lst[cell_id - 1]
+#     cell_mesh = ExtendedTrimesh(cell_mesh.vertices, cell_mesh.faces)
+    
+#     contact_area_total = 0
+#     contact_area_distribution = []
+#     # Loop over the neighbors of the cell
+#     for neighbor_id in cell_neighbors_lst:
+#         # Get potential contact faces using the get_potential_contact_faces method from ExtendedTrimesh class
+#         neighbour_mesh = ExtendedTrimesh(cell_mesh_lst[neighbor_id - 1].vertices, cell_mesh_lst[neighbor_id - 1].faces)
+#         contact_area = cell_mesh.calculate_contact_area(neighbour_mesh, contact_cutoff)
+#         contact_area_total += contact_area
+#         contact_area_distribution.append(contact_area)
+
+#     # Calculate the fraction of contact area
+#     contact_fraction = contact_area_total / cell_mesh.area
+
+#     # Calculate the mean of contact area
+#     mean_contact_area = np.mean(contact_area_distribution)
+
+#     return contact_fraction, contact_area_distribution, mean_contact_area
+
+
+
+
 
 #------------------------------------------------------------------------------------------------------------
+
+############################################################################################################   
+# Implementation considers the area fraction on the target cell itself, not negihbors
+# Benefit: Maximal contact area fraction is 1
+# Drawback: The contact area fraction is not symmetric between the two cells + not as memory efficient
+############################################################################################################
+
 def compute_cell_contact_area_fraction(cell_mesh_lst, cell_id, cell_neighbors_lst, contact_cutoff):
     """
     Compute the fraction of the cell surface area which is in contact with other cells.
@@ -212,29 +276,93 @@ def compute_cell_contact_area_fraction(cell_mesh_lst, cell_id, cell_neighbors_ls
         mean_contact_area: (float)
     """
     
-    if cell_neighbors_lst.__len__() == 0:
+    if len(cell_neighbors_lst) == 0:
         return 0, [], 0
 
     cell_mesh = cell_mesh_lst[cell_id - 1]
     cell_mesh = ExtendedTrimesh(cell_mesh.vertices, cell_mesh.faces)
     
-    contact_area_total = 0
+    contact_face_indices = set()
     contact_area_distribution = []
     # Loop over the neighbors of the cell
     for neighbor_id in cell_neighbors_lst:
         # Get potential contact faces using the get_potential_contact_faces method from ExtendedTrimesh class
-        neighbour_mesh = ExtendedTrimesh(cell_mesh_lst[neighbor_id - 1].vertices, cell_mesh_lst[neighbor_id - 1].faces)
-        contact_area = cell_mesh.calculate_contact_area(neighbour_mesh, contact_cutoff)
-        contact_area_total += contact_area
-        contact_area_distribution.append(contact_area)
+        neighbour_mesh = cell_mesh_lst[neighbor_id - 1]
+        neighbour_mesh = ExtendedTrimesh(neighbour_mesh.vertices, neighbour_mesh.faces)
+        contact_faces = neighbour_mesh.get_potential_contact_faces(cell_mesh, contact_cutoff)
 
+        # Calculate contact area for the current neighbor and add to distribution
+        neighbor_contact_area = np.sum(neighbour_mesh.area_faces[contact_faces])
+        contact_area_distribution.append(neighbor_contact_area)
+        contact_face_indices.update(contact_faces)
+
+    # Calculate the contact area for unique faces only
+    contact_area_total = np.sum(cell_mesh.area_faces[list(contact_face_indices)])
+    
     # Calculate the fraction of contact area
     contact_fraction = contact_area_total / cell_mesh.area
 
-    # Calculate the mean of contact area
-    mean_contact_area = np.mean(contact_area_distribution)
+    return contact_fraction, contact_area_distribution, np.mean(contact_area_distribution)
+#------------------------------------------------------------------------------------------------------------
 
-    return contact_fraction, contact_area_distribution, mean_contact_area
+
+
+
+
+#--------------------------------------------------------------------------------------------------
+############################################################################################################
+# Multiprocessing implementation of the contact area fraction calculation -- Old version
+############################################################################################################
+
+# def get_contact_area_fraction(mesh_lst: list, cell_id_lst: list, cell_neighbors_lst: list, contact_cutoff: float, calculate_contact_area_fraction: bool, max_workers: int):
+#     """
+#     Compute the contact area fraction for each cell in the mesh list.
+    
+#     Parameters:
+#     -----------
+#         mesh_lst (list):
+#             List of cell meshes.
+
+#         cell_id_lst (list):
+#             List of cell IDs.
+
+#         cell_neighbors_lst (list):
+#             List of neighbors for each cell.
+
+#         contact_cutoff (float):
+#             Contact cutoff value.
+
+#         calculate_contact_area_fraction (bool):
+#             Whether to calculate the contact area fraction.
+
+#         max_workers (int):
+#             Maximum number of workers for the ThreadPoolExecutor.
+
+#     Returns:
+#     --------
+#         cell_contact_area_dict (dict):
+#             Dictionary where key is cell_id and value is a tuple containing contact area fraction, contact area distribution, and mean contact area for each cell.
+#     """
+#     cell_contact_area_dict = {}
+
+#     # Check if contact area fraction should be calculated
+#     if calculate_contact_area_fraction:
+#         # Create a pool of workers
+#         with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
+#             future_to_cell_id = {executor.submit(compute_cell_contact_area_fraction, mesh_lst, cell_id, cell_neighbors, contact_cutoff): cell_id for cell_id, cell_neighbors in zip(cell_id_lst, cell_neighbors_lst)}
+
+#             # Collect the results as they complete
+#             for future in concurrent.futures.as_completed(future_to_cell_id):
+#                 cell_id = future_to_cell_id[future]
+#                 try:
+#                     cell_contact_area_dict[cell_id] = future.result()
+#                 except Exception as exc:
+#                     print(f'Cell {cell_id} generated an exception: {exc}')
+#     else:
+#         for cell_id in cell_id_lst:
+#             cell_contact_area_dict[cell_id] = (None, [], None)
+
+#     return cell_contact_area_dict
 #------------------------------------------------------------------------------------------------------------
 
 
@@ -242,7 +370,8 @@ def compute_cell_contact_area_fraction(cell_mesh_lst, cell_id, cell_neighbors_ls
 
 
 
-#--------------------------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------------------------------------
 def get_contact_area_fraction(mesh_lst: list, cell_id_lst: list, cell_neighbors_lst: list, contact_cutoff: float, calculate_contact_area_fraction: bool, max_workers: int):
     """
     Compute the contact area fraction for each cell in the mesh list.
@@ -281,7 +410,7 @@ def get_contact_area_fraction(mesh_lst: list, cell_id_lst: list, cell_neighbors_
             future_to_cell_id = {executor.submit(compute_cell_contact_area_fraction, mesh_lst, cell_id, cell_neighbors, contact_cutoff): cell_id for cell_id, cell_neighbors in zip(cell_id_lst, cell_neighbors_lst)}
 
             # Collect the results as they complete
-            for future in concurrent.futures.as_completed(future_to_cell_id):
+            for future in tqdm(concurrent.futures.as_completed(future_to_cell_id), desc='Calculating contact area fraction', total=len(cell_id_lst)):
                 cell_id = future_to_cell_id[future]
                 try:
                     cell_contact_area_dict[cell_id] = future.result()
@@ -547,5 +676,6 @@ def collect_cell_morphological_statistics(labeled_img: np.ndarray, img_resolutio
                                                   plot, plot_type)
 
     return cell_statistics_df
+#-----------------------------------------------------------------------------------------------------------
 
-#------------------------------------------------------------------------------------------------------------
+

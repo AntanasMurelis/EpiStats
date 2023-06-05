@@ -46,19 +46,15 @@ def remove_unconnected_regions(labeled_img, pad_width=10):
 
         # Label connected regions
         labeled_mask, num_features = ndimage.label(binary_mask)
-        
         # Remove unconnected regions
         if num_features > 1:
             region_sizes = ndimage.sum(binary_mask, labeled_mask, range(num_features + 1))
             largest_region_label = np.argmax(region_sizes[1:]) + 1
             filtered_region = labeled_mask == largest_region_label
-            filtered_labeled_img[labeled_mask != filtered_region] = 0
-
+            filtered_labeled_img[binary_mask != filtered_region] = 0
 
     return filtered_labeled_img
 #-----------------------------------------------------------------------------------------------------------------------------
-
-
 
 
 #-----------------------------------------------------------------------------------------------------------------------------
@@ -242,6 +238,7 @@ def remove_labels_touching_background(labeled_img, threshold=10):
 
 
 #-------------------------------------------------------------------------------------------------------------
+
 #######################################################################################################################
 # Removing peripheral labels:
 # Improved implementation: Removing all labels touching the edges of the image
@@ -285,7 +282,6 @@ def remove_labels_touching_edges(labeled_img):
             filtered_labeled_img[labeled_img == region.label] = 0
 
     return filtered_labeled_img
-
 #------------------------------------------------------------------------------------------------------------
 
 
@@ -373,6 +369,9 @@ def extend_labels(labeled_img, erosion_iterations=1, dilation_iterations=2, radi
 #------------------------------------------------------------------------------------------------------------
 
 
+
+
+
 #------------------------------------------------------------------------------------------------------------
 def convert_cell_labels_to_meshes(
     img: np.array,
@@ -448,6 +447,7 @@ def convert_cell_labels_to_meshes(
 
 
 
+
 #------------------------------------------------------------------------------------------------------------
 def process_labels(labeled_img, erosion_iterations=1, dilation_iterations=2, output_directory='output', overwrite=False):
     """
@@ -486,13 +486,10 @@ def process_labels(labeled_img, erosion_iterations=1, dilation_iterations=2, out
         preprocessed_labels = np.load(processed_labels_file)
     else:
         # Generate processed_labels
-        #labeled_img = np.pad(labeled_img, 10, mode='constant', constant_values=0)
         unconnected_labels = remove_unconnected_regions(labeled_img)
         renumbered_labeled_img = renumber_labels(unconnected_labels)
         preprocessed_labels = extend_labels(renumbered_labeled_img, erosion_iterations=erosion_iterations, dilation_iterations=dilation_iterations)
-        #  Remove the padding:
-        #preprocessed_labels = preprocessed_labels[10:-10, 10:-10, 10:-10]
-        
+
         # Save the processed_labels
         if not os.path.exists(output_directory):
             os.makedirs(output_directory)
@@ -533,11 +530,12 @@ def load_or_create_filtered_labels(preprocessed_labels: np.ndarray, cell_volumes
         filtered_labels = np.unique(filtered_label_image)[1:]
         
         # Filter based on volume thresholds
-        if volume_lower_threshold is not None or volume_upper_threshold is not None:
-            filtered_labels = np.array([label for label in filtered_labels if
-                                        (volume_lower_threshold is None or cell_volumes[label - 1] >= volume_lower_threshold) and
-                                        (volume_upper_threshold is None or cell_volumes[label - 1] <= volume_upper_threshold)])
-        
+    if volume_lower_threshold is not None or volume_upper_threshold is not None:
+        filtered_labels = np.array([
+            label for label in filtered_labels 
+            if (volume_lower_threshold is None or (volume_lower_threshold is not None and cell_volumes[label - 1] >= volume_lower_threshold)) 
+            and (volume_upper_threshold is None or (volume_upper_threshold is not None and cell_volumes[label - 1] <= volume_upper_threshold))
+    ])
         np.save(filtered_labels_path, filtered_labels)
     
     return filtered_labels
@@ -569,6 +567,7 @@ def get_preprocessed_labels(labeled_img: np.ndarray, preprocess: bool, erosion_i
         preprocessed_labels = labeled_img
     return preprocessed_labels
 #------------------------------------------------------------------------------------------------------------
+
 
 
 
@@ -613,3 +612,35 @@ def full_label_processing(labeled_img, img_resolution, smoothing_iterations=5, e
 
     return mesh_lst, cell_id_lst, filtered_cell_id_lst, cell_neighbors_lst, output_directory
 #--------------------------------------------------------------------------------------------------
+
+
+
+
+#--------------------------------------------------------------------------------------------------
+def test_remove_unconnected_regions():
+    # Create a 3D image with labeled regions
+    labeled_img = np.zeros((20, 20, 20))
+    
+    # Add labeled regions
+    labeled_img[5:10, 5:10, 5:10] = 1  # main cell body
+    labeled_img[15:17, 15:17, 15:17] = 1  # unconnected region
+
+    labeled_img[5:10, 5:10, 10:15] = 2  # main cell body
+    labeled_img[0:2, 0:2, 0:2] = 2  # unconnected region
+
+    # Run the function
+    result = remove_unconnected_regions(labeled_img)
+
+    # Check that the output has the expected properties
+    assert np.unique(result).tolist() == [0, 1, 2], "All expected labels are not present in the output"
+    assert np.sum(result == 1) == 5*5*5, "The size of the connected region with label 1 is not as expected"
+    assert np.sum(result == 2) == 5*5*5, "The size of the connected region with label 2 is not as expected"
+
+    # Check that unconnected regions have been removed
+    assert not np.any(result[15:17, 15:17, 15:17]), "Unconnected region with label 1 was not removed"
+    assert not np.any(result[0:2, 0:2, 0:2]), "Unconnected region with label 2 was not removed"
+#--------------------------------------------------------------------------------------------------
+
+
+if __name__ == '__main__':
+    test_remove_unconnected_regions()
