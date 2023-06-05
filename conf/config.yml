@@ -1,0 +1,53 @@
+# conf/config.yaml
+defaults:
+  - _self_
+
+# Path to the labeled image (3D numpy array or image file ie. .tiff file)
+labeled_img: "path/to/tiff"
+
+# Image resolution in microns (x_res, y_res, z_res)
+img_resolution: [0.21, 0.21, 0.39]
+
+# Cutoff distance in microns for two cells to be considered in contact
+contact_cutoff: 0.5
+
+# Number of smoothing iterations applied to the mesh (default: 5)
+smoothing_iterations: 5
+
+# Number of iterations for erosion during label extension (default: 1)
+erosion_iterations: 1
+
+# Number of iterations for dilation during label extension (default: 2)
+dilation_iterations: 2
+
+# Name of the folder where the processed labels, cell_meshes, and filtered_cell_meshes will be saved (default: 'output')
+output_folder: "path/to/output"
+
+# Save meshes only without computing statistics
+meshes_only: false
+
+# Overwrite preprocessed labels if they already exist
+overwrite: false
+
+# Run preprocessing on the input labeled image
+preprocess: false
+
+# Calculate the contact area fraction for each cell (default: True)
+calculate_contact_area_fraction: true
+
+# Maximum number of workers for parallel computation (default: number of CPU cores - 1)
+max_workers: null  # If specific number is not provided, it defaults to number of CPU cores - 1
+
+# Generate plots for the cell statistics. Options: 'filtered', 'both', 'all', or None (default: None)
+plot: "both" 
+
+# Type of plot to generate (default: 'violin')
+plot_type: "violin"
+
+# Minimum volume to include a cell in the filtered labels (default: None)
+volume_lower_threshold: null
+
+# Maximum volume to include a cell in the filtered labels (default: None)
+volume_upper_threshold: null
+
+

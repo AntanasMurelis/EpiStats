@@ -1,0 +1,3 @@
+napari==0.4.17
+pymeshfix==0.16.2
+trimesh==3.21.7
