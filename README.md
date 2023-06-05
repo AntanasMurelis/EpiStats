@@ -53,11 +53,11 @@ meshes_only: False
 overwrite: False
 preprocess: True
 calculate_contact_area_fraction: True
-max_workers: None
+max_workers: null
 plot: "both"
 plot_type: violin
-volume_lower_threshold: None
-volume_upper_threshold: None
+volume_lower_threshold: null
+volume_upper_threshold: null
 ```
 
 Please modify the paths and values according to your local setup.
