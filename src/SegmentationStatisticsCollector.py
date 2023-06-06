@@ -1155,7 +1155,12 @@ def reconstruct_contact_matrix(cell_id_lst: list, cell_neighbors_lst: list, cell
             contact_matrix[cell_id - 1][neighbor - 1] = contact_area
 
     return contact_matrix
+#------------------------------------------------------------------------------------------------------
 
+
+
+
+#------------------------------------------------------------------------------------------------------
 def evaluate_matrix_symmetry(A: np.ndarray) -> float:
     """
     Evaluate the symmetry of a matrix using the formula:
@@ -1178,8 +1183,12 @@ def evaluate_matrix_symmetry(A: np.ndarray) -> float:
     symmetry = 1 - ((1/2) * (norm_diff / norm_A)) ** 2
 
     return symmetry
+#------------------------------------------------------------------------------------------------------
 
-#--------------------------------------------------------------------------------------------------
+
+
+
+#------------------------------------------------------------------------------------------------------
 def full_label_processing(labeled_img, img_resolution, smoothing_iterations=5, erosion_iterations=1, dilation_iterations=2, 
                           output_folder='output', preprocess=True, overwrite=False, volume_lower_threshold=200, volume_upper_threshold=10000) -> tuple:
     """

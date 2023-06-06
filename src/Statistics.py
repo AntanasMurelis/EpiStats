@@ -280,7 +280,6 @@ def compute_cell_contact_area_fraction(cell_mesh_lst, cell_id, cell_neighbors_ls
         return 0, [], 0
 
     cell_mesh = cell_mesh_lst[cell_id - 1]
-    cell_mesh = ExtendedTrimesh(cell_mesh.vertices, cell_mesh.faces)
     
     contact_face_indices = set()
     contact_area_distribution = []
@@ -292,8 +291,8 @@ def compute_cell_contact_area_fraction(cell_mesh_lst, cell_id, cell_neighbors_ls
         contact_faces = neighbour_mesh.get_potential_contact_faces(cell_mesh, contact_cutoff)
 
         # Calculate contact area for the current neighbor and add to distribution
-        neighbor_contact_area = np.sum(neighbour_mesh.area_faces[contact_faces])
-        contact_area_distribution.append(neighbor_contact_area)
+        contact_area = np.sum(cell_mesh.area_faces[contact_faces])
+        contact_area_distribution.append(contact_area)
         contact_face_indices.update(contact_faces)
 
     # Calculate the contact area for unique faces only
