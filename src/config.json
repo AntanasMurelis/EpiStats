@@ -9,5 +9,5 @@
     "mesh_format": "stl",
     "max_workers": 4,
     "features": ["area", "volume", "elongation_and_axes", "neighbors", "contact_area"],
-    "load_from_cache": true
+    "load_from_cache": false
 }
