@@ -481,7 +481,7 @@ def _compute_2D_neighbors(
         else:
             neighbors_lst = []
 
-        neighbors_dict[label] = neighbors_lst
+        neighbors_dict[label] = list(neighbors_lst)
 
     return neighbors_dict
 
