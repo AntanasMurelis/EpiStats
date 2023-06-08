@@ -214,7 +214,11 @@ class StatsCollector:
             feature_unpacked: (pd.Series[any])
                 A pd.Series of the statistics values.
         '''
-        feature_unpacked = pd.Series(list(feature_dict.values()))
+        
+        #order the dict according to its keys
+        sorted_feature_dict = {k: feature_dict[k] for k in sorted(feature_dict)}
+        #transform dictionary into a pd.Series
+        feature_unpacked = pd.Series(list(sorted_feature_dict.values()))
         return feature_unpacked
     
     
