@@ -5,11 +5,11 @@ from typing import Optional
 
 #-----------------------------------------------------------------------------
 def create_slurm(
-        config_file, 
-        name: str,
-        jobs_dir: Optional[str] = './jobs',
-        max_workers: int
-    ) -> str:
+    config_file: str, 
+    name: str,
+    max_workers: int,
+    jobs_dir: Optional[str] = './jobs',
+) -> str:
     '''
     Create a bash script to run the training on cluster.
 
@@ -41,7 +41,7 @@ def create_slurm(
 #SBATCH --time=12:00:00
 #SBATCH --mem-per-cpu=10240
 
-python run.py --config {config_file}   
+python src/run.py --config {config_file}   
     """
 
     script_file = f'submit_training_{name}.sh'
@@ -57,7 +57,7 @@ python run.py --config {config_file}
 
 
 #Read the config.json file
-with open("config.json", "r") as file:
+with open("src/config.json", "r") as file:
     curr_config = json.load(file)
 
 #Set ranges of parameters to modify in the config
