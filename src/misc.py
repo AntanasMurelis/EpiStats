@@ -1,7 +1,6 @@
 import numpy as np
 from skimage import io
 import os
-import pyclesperanto_prototype as cle
 import json
 from types import SimpleNamespace
 from typing import Union

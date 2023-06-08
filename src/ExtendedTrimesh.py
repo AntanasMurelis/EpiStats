@@ -27,14 +27,23 @@ class ExtendedTrimesh(trimesh.Trimesh):
         Returns:
         potential_contact_faces (list): List of indices of the potential contact faces in other_mesh.
         """
-        potential_contact_faces = []  # Initialize list to hold potential contact face indices.
-        for face_index in range(len(other_mesh.faces)):  # Loop through all the faces of other_mesh.
-            face = other_mesh.vertices[other_mesh.faces[face_index]]  # Get the vertices of the current face.
-            centroid = np.mean(face, axis=0).reshape(1, -1)  # Calculate the centroid of the face.
-            dist, idx = self.my_kdtree.query(centroid)  # Query the KDTree to find the distance and index of the nearest point in this mesh to the face centroid.
-            if dist < distance:  # If the distance is less than the given distance, then this face is in potential contact.
-                potential_contact_faces.append(face_index)  # Add the index of this face to the list of potential contact faces.
-        return potential_contact_faces  # Return the list of potential contact faces.
+        # Initialize list to hold potential contact face indices
+        potential_contact_faces = []
+        # Loop through all the faces of other_mesh
+        for face_index in range(len(other_mesh.faces)): 
+            # Get the vertices of the current face
+            face = other_mesh.vertices[other_mesh.faces[face_index]]
+            # Calculate the centroid of the face  
+            centroid = np.mean(face, axis=0).reshape(1, -1)
+            # Query the KDTree to find the distance and index of the nearest point in this mesh to the face centroid
+            dist, idx = self.my_kdtree.query(centroid)  
+            # If the distance is less than the given distance, then this face is in potential contact
+            if dist < distance:  
+                # Add the index of this face to the list of potential contact faces
+                potential_contact_faces.append(face_index)  
+        
+        return potential_contact_faces  
+
 
     def calculate_contact_area(self, other_mesh, distance):
         """
@@ -48,9 +57,14 @@ class ExtendedTrimesh(trimesh.Trimesh):
         Returns:
         contact_area (float): The total contact area between this mesh and other_mesh.
         """
-        contact_faces_indices = self.get_potential_contact_faces(other_mesh, distance)  # Get indices of potential contact faces.
-        contact_area = np.sum(other_mesh.area_faces[contact_faces_indices])  # Calculate the contact area by summing the areas of the potential contact faces.
-        return contact_area  # Return the total contact area.
+
+        # Get indices of potential contact faces
+        contact_faces_indices = self.get_potential_contact_faces(other_mesh, distance)
+        # Calculate the contact area by summing the areas of the potential contact faces
+        contact_area = np.sum(other_mesh.area_faces[contact_faces_indices])
+        
+        return contact_area
+    
 #----------------------------------------------------------------------------------------------------------------------
 
 

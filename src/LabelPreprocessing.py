@@ -351,9 +351,11 @@ def process_labels(
 
     if os.path.exists(processed_labels_file) and not overwrite:
         # Load the existing processed_labels
+        print("Loading previously preprocessed labels...")
         preprocessed_labeled_img = imread(processed_labels_file)
     else:
         # Generate processed_labels
+        print("Preprocessing labels...")
         preprocessed_labeled_img = remove_unconnected_regions(labeled_img)
         preprocessed_labeled_img, _, _ = relabel_sequential(preprocessed_labeled_img)
         if smoothing_radius:

@@ -1,12 +1,13 @@
 {
-    "input_path": "",
-    "output_path": "output",
-    "tissue": "",
-    "erosion_iters": 1,
-    "dilation_iters": 2,
-    "smoothing_iters": 5,
-    "voxel_size": [1, 1, 1],
+    "input_path": "../../curated_labels/bladder_control_curated_segmentation.tif",
+    "output_path": "./output",
+    "tissue": "bladder",
+    "erosion_iters": 6,
+    "dilation_iters": 8,
+    "smoothing_iters": 10,
+    "voxel_size": [0.21, 0.21, 0.39],
     "mesh_format": "stl",
-    "max_workers": 8,
-    "features": ["area", "volume", "elongation_and_axes", "neighbors", "contact_area"]
+    "max_workers": 4,
+    "features": ["area", "volume", "elongation_and_axes", "neighbors", "contact_area"],
+    "load_from_cache": true
 }

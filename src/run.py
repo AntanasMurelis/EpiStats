@@ -5,7 +5,7 @@ Run this script to collect statistics from epithelial tissues.
 import os
 import argparse
 from misc import create_output_directory, load_labeled_img, read_config
-from StatsCollection import StatsCollector
+from StatsCollector import StatsCollector
 from LabelPreprocessing import process_labels
 from GenMeshes import convert_labels_to_meshes
 
@@ -54,10 +54,11 @@ def main(config_path):
         output_directory=output_dir,
         path_to_img=os.path.join(output_dir, 'processed_labels.tif'),
         tissue=args.tissue,
+        voxel_size=args.voxel_size,
         num_workers=args.max_workers
     )
 
-    stats_collector.collect_statistics()
+    stats_collector.collect_statistics(load_from_cache=args.load_from_cache)
 
 
 if __name__ == "__main__":

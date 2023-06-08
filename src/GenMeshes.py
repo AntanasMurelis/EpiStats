@@ -1,7 +1,7 @@
 import numpy as np
 import trimesh as tm
 import os
-from typing import Optional, Iterable, Dict, Union
+from typing import Optional, Iterable, Dict
 from tqdm import tqdm
 from napari_process_points_and_surfaces import label_to_surface
 
