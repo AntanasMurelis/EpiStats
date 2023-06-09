@@ -8,6 +8,7 @@ from skimage.measure import mesh_surface_area
 from collections import defaultdict
 from typing import Optional, List, Tuple, Iterable, Dict, Union
 from ExtendedTrimesh import ExtendedTrimesh
+import napari
 
 
 #------------------------------------------------------------------------------------------------------------
@@ -48,47 +49,6 @@ def compute_cell_surface_areas(
     
     return area_dict
 #------------------------------------------------------------------------------------------------------------
-
-
-
-# #------------------------------------------------------------------------------------------------------------
-# def compute_cell_volumes(
-#         cell_mesh_dict: Dict[int, tm.base.Trimesh],
-#         exclude_labels: Iterable[int],
-#     ) -> Dict[int, float]:
-#     """
-#     Use the meshes of the cells to compute their volumes (in micron cubes).
-    
-#     Parameters:
-#     -----------
-#     cell_mesh_dict: (Dict[int, tm.base.Trimesh])
-#         The tirangular meshes of the cell in the standard trimesh format
-#         associated to the corresponding cell label
-
-#     exclude_labels: (Iterable[int])
-#         A collection of cell indexes to exclude from neighbors computation. 
-#         However, these cells are considered in other cells neighbors counts.
-
-#     Returns:
-#     --------
-#     volume_dict: (Dict[int, float])
-#         List of the volume of each cell
-#     """
-
-#     assert cell_mesh_dict.__len__() > 0
-
-#     volume_dict = {}
-
-#     for id, mesh in tqdm(cell_mesh_dict.items(),
-#                          desc="Computing cell volume",
-#                          total=len(cell_mesh_dict)):
-#         if id not in exclude_labels:
-#             volume_dict[id] = mesh.volume
-#         else:
-#             volume_dict[id] = None
-
-#     return volume_dict
-# #------------------------------------------------------------------------------------------------------------
 
 
 
@@ -250,79 +210,13 @@ def compute_cell_neighbors(
 
 
 
-# #--------------------------------------------------------------------------------------------------
-# def _compute_contact_area(
-#         cell_mesh_dict: Dict[int, tm.base.Trimesh],
-#         cell_id: int, 
-#         cell_neighbors_lst: List[int], 
-#         contact_cutoff: float
-#     ) -> Tuple[float, List[float]]:
-#     """
-#     Compute the fraction of the cell surface area which is in contact with other cells.
-    
-#     Parameters:
-#     -----------
-#     cell_mesh_dict: (Dict[int, tm.base.Trimesh])
-#         The triangular meshes of the cell in the standard trimesh format
-#         with the corresponding cell label as key.
-
-#     cell_id: (int)
-#         The id of the cell for which we want to calculate the contact area fraction.
-
-#     cell_neighbors_lst: (List[int])
-#         List of the ids of the neighbors of the current cell.
-
-#     contact_cutoff: (float)
-#         The cutoff distance in microns for two cells to be considered in contact.
-
-#     Returns:
-#     --------
-#     contact_fraction: (float)
-#         The percentage of the total cell surface are in contact with neighboring cells.
-    
-#     contact_area_distribution: (List[float])
-#         A list of the contact areas between the cell and each one of the neigbors.
-#     """
-
-#     num_cells = len(cell_mesh_dict)
-
-#     if len(cell_neighbors_lst) > 0:
-#         print(f'    Calculating contact area for cell {cell_id}/{num_cells} ... ')
-#         # start = time()
-#         cell_mesh = cell_mesh_dict[cell_id]
-#         cell_mesh = ExtendedTrimesh(cell_mesh.vertices, cell_mesh.faces)
-#         contact_face_indices = set()
-#         contact_area_distribution = np.zeros(len(cell_neighbors_lst))
-#         # Loop over the neighbors of the cell
-#         for i, neighbor_id in enumerate(cell_neighbors_lst):
-#             # Get potential contact faces using the get_potential_contact_faces method from ExtendedTrimesh class
-#             neighbour_mesh = ExtendedTrimesh(cell_mesh_dict[neighbor_id].vertices, cell_mesh_dict[neighbor_id].faces)
-#             contact_faces = neighbour_mesh.get_potential_contact_faces(cell_mesh, contact_cutoff)
-            
-#             # Calculate contact area for the current neighbor and add to distribution
-#             neighbor_contact_area = np.sum(neighbour_mesh.area_faces[contact_faces])
-#             contact_face_indices.update(contact_faces)
-#             contact_area_distribution[i] = neighbor_contact_area
-
-#         # Calculate total and fraction of contact area
-#         contact_area_total = np.sum(cell_mesh.area_faces[list(contact_face_indices)])
-#         contact_fraction = contact_area_total / cell_mesh.area
-#         # print(f'elspsed time: {time() - start}')
-#     else:
-#         print(f'    Skipping cell {cell_id}/{num_cells} ...')
-#         contact_fraction, contact_area_distribution = None, []
-
-#     return contact_fraction, contact_area_distribution
-# #------------------------------------------------------------------------------------------------------------
-
-
-
 #--------------------------------------------------------------------------------------------------
 def _compute_contact_area(
         cell_mesh_dict: Dict[int, tm.base.Trimesh],
         cell_id: int, 
         cell_neighbors_lst: List[int], 
-        contact_cutoff: float
+        contact_cutoff: float,
+        show_napari: Optional[bool] = False
     ) -> Tuple[float, List[float]]:
     """
     Compute the fraction of the cell surface area which is in contact with other cells.
@@ -342,6 +236,11 @@ def _compute_contact_area(
     contact_cutoff: (float)
         The cutoff distance in microns for two cells to be considered in contact.
 
+    show_napari: (Optional[bool], default=False)
+        For debugging purpose.
+        If `True` opens a napari viewer to show the cell mesh, the neighbors meshes and the
+        contact areas.
+
     Returns:
     --------
     contact_fraction: (float)
@@ -355,26 +254,40 @@ def _compute_contact_area(
 
     if len(cell_neighbors_lst) > 0:
         print(f'    Calculating contact area for cell {cell_id}/{num_cells} ... ')
-        # start = time()
         cell_mesh = cell_mesh_dict[cell_id]
         cell_mesh = ExtendedTrimesh(cell_mesh.vertices, cell_mesh.faces)
         contact_face_indices = set()
         contact_area_distribution = np.zeros(len(cell_neighbors_lst))
+        if show_napari:
+            neighbor_meshes = []
+            contact_faces_lst = []
         # Loop over the neighbors of the cell
         for i, neighbor_id in enumerate(cell_neighbors_lst):
             # Get potential contact faces using the get_potential_contact_faces method from ExtendedTrimesh class
-            neighbour_mesh = ExtendedTrimesh(cell_mesh_dict[neighbor_id].vertices, cell_mesh_dict[neighbor_id].faces)
-            contact_faces = neighbour_mesh.get_potential_contact_faces(cell_mesh, contact_cutoff)
+            neighbor_mesh = ExtendedTrimesh(cell_mesh_dict[neighbor_id].vertices, cell_mesh_dict[neighbor_id].faces)
+            contact_faces = neighbor_mesh.get_potential_contact_faces(cell_mesh, contact_cutoff)
             
             # Calculate contact area for the current cell and add to distribution
             contact_area = np.sum(cell_mesh.area_faces[contact_faces])
             contact_area_distribution[i] = contact_area
             contact_face_indices.update(contact_faces)
 
+            if show_napari:
+                neighbor_meshes.append(neighbor_mesh)
+                contact_faces_lst.append(contact_faces)
+
         # Calculate total and fraction of contact area
         contact_area_total = np.sum(cell_mesh.area_faces[list(contact_face_indices)])
         contact_fraction = contact_area_total / cell_mesh.area
-        # print(f'elspsed time: {time() - start}')
+
+        if show_napari:
+            with napari.gui_qt():
+                viewer = napari.Viewer()
+                viewer.add_surface((cell_mesh.vertices, cell_mesh.faces), name='target', blending='additive', colormap='green')
+                for i, neighbor_mesh in enumerate(neighbor_meshes):
+                    viewer.add_surface((cell_mesh.vertices, cell_mesh.faces[contact_faces_lst[i]]), colormap='red', name='contact_faces')
+                    viewer.add_surface((neighbor_mesh.vertices, neighbor_mesh.faces), name=f'neighbor_{i}', blending='additive', opacity=0.5)
+
     else:
         print(f'    Skipping cell {cell_id}/{num_cells} ...')
         contact_fraction, contact_area_distribution = None, []
@@ -389,7 +302,7 @@ def compute_cell_contact_area(
         cell_mesh_dict: Dict[int, tm.base.Trimesh],
         cell_neighbors_dict: Dict[int, List[int]], 
         max_workers: int,
-        contact_cutoff: Optional[float] = 0.1, 
+        contact_cutoff: Optional[float] = 0.5, 
     ) -> Dict[any, Union[float, List[float]]]:
     """
     Compute the contact area fraction for each cell in the mesh list.

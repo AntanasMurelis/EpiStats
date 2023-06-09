@@ -291,7 +291,8 @@ class StatsCollector:
             args = (
                 self.meshes,
                 neighbors_dict,
-                self.num_workers
+                self.num_workers,
+                max(self.voxel_size)*2
             )
         elif feature_name == '2D_statistics':
             args = (

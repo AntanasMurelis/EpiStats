@@ -15,7 +15,7 @@ def convert_labels_to_meshes(
     overwrite: Optional[bool] = False,
     pad_width: Optional[int] = 0,
     mesh_file_format: Optional[str] = 'stl'
-) -> Dict[int, Dict[str, tm.base.Trimesh]]:
+) -> Dict[int, tm.base.Trimesh]:
     """
     Convert the labels of the cells in the 3D segmented image to triangular meshes. Please make sure that the 
     image has correctly been segmented, i.e. that there is no artificially small cells, or cell labels 
@@ -46,10 +46,9 @@ def convert_labels_to_meshes(
 
     Returns:
     --------
-        mesh_lst (Dict[int, Dict[str, tm.base.Trimesh or bool]):
+        mesh_dict (Dict[int, tm.base.Trimesh):
             A dictionary whose keys are cell indexes and values are pairs of triangular meshes, 
-            in the trimesh format and boolean indicating whether the cell should be excluded 
-            from later computations.
+            in the trimesh format.
     
     """
     
