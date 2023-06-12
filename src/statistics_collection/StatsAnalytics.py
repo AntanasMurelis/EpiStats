@@ -263,7 +263,7 @@ def extract_numerical(
 
     '''
     #keep only id features plus numerical ones
-    id_features = ['cell_ID', 'tissue', 'tissue_type']
+    id_features = ['cell_ID', 'tissue', 'tissue_type', 'is_outlier']
     keep_features = id_features + numeric_features
     drop_features = [feat for feat in df.columns if feat not in keep_features]
 
@@ -382,10 +382,7 @@ def apply_PCA(
     pca_fit = pca.fit(df[numeric_features])
 
     pca_data =  pca_fit.transform(df[numeric_features])
-    pca_loadings = np.concatenate(
-        [pca_fit.components_[i] for i in range(n_comps)], 
-        axis=0
-    )
+    pca_loadings = np.array([pca_fit.components_[i] for i in range(n_comps)])
     explained_var = pca_fit.explained_variance_ratio_
 
     return pca_data, pca_loadings, explained_var
