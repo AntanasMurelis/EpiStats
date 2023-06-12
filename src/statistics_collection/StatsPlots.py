@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy import stats
 from StatsAnalytics import standardize, apply_PCA, extract_numerical
-from typing import Optional, List, Tuple, Iterable
+from typing import Optional, List, Tuple, Iterable, Literal
 
 
 
@@ -413,5 +413,94 @@ def num_neighbors_barplot(
         plt.show()
     else:
         plt.close()
+
+#------------------------------------------------------------------------------------------------------------
+
+
+
+#------------------------------------------------------------------------------------------------------------
+def lewis_law_plots(
+    df: pd.DataFrame, 
+    feature: Literal['volume', 'area'] = 'volume',
+    fit_degrees: Optional[Iterable[int]] = [1,2],
+    save_dir: Optional[str] = None,     
+    show: Optional[bool] = False 
+) -> None:
+    
+    # Create a separate figure for each tissue type in the data
+    tissues = df['tissue'].unique()
+    tissue_types = df['tissue_type'].unique()
+    colors = sns.color_palette('viridis', len(tissues))
+
+    fig = plt.figure(figsize=(18, 6))
+    fig.suptitle(f"Lewis' Law for {feature.replace('_', ' ')}", fontsize=30)
+    subplot_id = 1
+    for i, tissue in enumerate(tissues):
+        # Get the current axis object
+        ax = fig.add_subplot(1, len(tissues), subplot_id)
+        subplot_id += 1
+
+        # Subset the data for the current tissue
+        tissue_df = df[df['tissue'] == tissue]
+
+        # Compute global volume average
+        global_avg = tissue_df[feature].mean()
+
+        # Compute average volume for each value of n
+        num_neighbors_values = np.asarray(tissue_df['num_neighbors'].unique())
+        local_avgs, local_sds = {}, {}
+        for n in num_neighbors_values:
+            #subset the df
+            data = tissue_df[tissue_df['num_neighbors'] == n][feature]
+            # compute the average for this n
+            local_avgs[n] = data.mean()/global_avg
+            local_sds[n] = (data/global_avg).std()/np.sqrt(len(data))
+        # Sort dict by key
+        local_avgs = dict(sorted(local_avgs.items()))
+        local_sds = dict(sorted(local_sds.items()))
+        std_devs = list(local_sds.values())
+
+        # Compute fitted lines
+        x = np.asarray(list(local_avgs.keys()), dtype=np.int64)
+        y = list(local_avgs.values())
+        coeff_sets = [np.polyfit(x, y, degree) for degree in fit_degrees]
+        polylines = [np.poly1d(coeff_set) for coeff_set in coeff_sets] 
+        x_fit = np.linspace(min(x), max(x), max(x)-min(x)+1, dtype=np.int32) 
+        y_linear, y_quadratic = (polyline(x_fit) for polyline in polylines)
+
+        # Plot the values and the fitted lines
+        # scatter = ax.scatter(x, y, c=colors[i])
+        ax.errorbar(x, y, yerr=std_devs, fmt='o', color=colors[i], ecolor='grey', capsize=4)
+        linear, = ax.plot(x_fit, y_linear, color='red', linestyle='--', label='Linear fit')   
+        quadratic, = ax.plot(x_fit, y_quadratic, color='green', linestyle='-.', label='Quadratic fit')
+
+        # Set title and axes labels
+        ax.set_title(f'{tissue.title()}: {tissue_types[i]}', fontsize=20)
+        ax.set_xlabel(r'Number of neighbors $(n)$', fontsize=20)
+        if feature == 'volume':
+            ax.set_ylabel(r'$\bar{V}_n / \bar{V}$', fontsize=20)
+        elif feature == 'surface_area':
+            ax.set_ylabel(r'$\bar{A}_n / \bar{A}$', fontsize=20)
+        ax.set_xticks(x_fit)
+        ax.legend(handles=[linear, quadratic], loc='lower right')
+
+        # Remove the square around the plot
+        sns.despine(left=False, bottom=False, top=True, right=True)
+    
+    plt.subplots_adjust(top=0.8)
+
+    # Save the current plot
+    if save_dir:
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+        save_name = f"lewis_law_{feature}_plots.jpg"
+        plt.savefig(os.path.join(save_dir, save_name), bbox_inches='tight', dpi=150) 
+
+    # Show the plot
+    if show:
+        plt.show()
+    else:
+        plt.close()
+
 
 #------------------------------------------------------------------------------------------------------------
