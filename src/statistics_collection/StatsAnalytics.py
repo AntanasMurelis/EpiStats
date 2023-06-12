@@ -1,13 +1,7 @@
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
-import os
-import seaborn as sns
-from skimage.io import imread
-from scipy import stats
-from copy import deepcopy
 from typing import Optional, Iterable, Tuple, Union, Literal, Callable
 
 
@@ -337,3 +331,63 @@ def standardize(
 
 #------------------------------------------------------------------------------------------------------------
 
+
+
+#------------------------------------------------------------------------------------------------------------
+def apply_PCA(
+    df: pd.DataFrame,
+    numeric_features: Optional[Iterable[str]] = [
+        'volume', 'num_neighbors', 'elongation',
+        'isoperimetric_ratio', 'area'
+    ],
+    n_comps: Optional[int] = 2,
+    standardize_data: Optional[bool] = True
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    '''
+    Return the principal components and their loading computed on
+    the chosen numerical features of the input dataframe.
+
+    Parameters:
+    -----------
+        df: (pd.DataFrame)
+            The dataframe to compute principal components on.
+
+        numeric_features: (Optional[Iterable[str]])
+            A list of numerical features to be extracted from the input dataframe.
+        
+        n_comps: (Optional[int], default=2)
+            The number of principal components to extract from the data.
+        
+        standardize_data: (Optional[bool], deafult=True)
+            If true standardize the input data before applying PCA.
+     
+    Returns:
+    --------
+        pca_data: (np.ndarray)
+            An array of size `len(df) * n_components`, containing the 
+            projections on the principal components of each record.
+
+        pca_loadings: (np.ndarray)
+            An array of size `len(numeric_features) * n_components`, in which each 
+            columns is the set of weights associated to each principal component.
+
+        explained_var: (np.ndarray)
+            The variance explained (ratio) by each principal component.
+    '''
+
+    if standardize_data:
+        df = standardize(df, numeric_features)
+
+    pca = PCA(n_components=n_comps)
+    pca_fit = pca.fit(df[numeric_features])
+
+    pca_data =  pca_fit.transform(df[numeric_features])
+    pca_loadings = np.concatenate(
+        [pca_fit.components_[i] for i in range(n_comps)], 
+        axis=0
+    )
+    explained_var = pca_fit.explained_variance_ratio_
+
+    return pca_data, pca_loadings, explained_var
+
+#------------------------------------------------------------------------------------------------------------
