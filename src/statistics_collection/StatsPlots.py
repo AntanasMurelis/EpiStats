@@ -40,6 +40,7 @@ def corr_matrix_plot(
     df: pd.DataFrame,
     numerical_features: Iterable[str],
     standardize_data: Optional[bool] = True,
+    remove_outliers: Optional[bool] = True,
     save_dir: Optional[str] = None, 
     show: Optional[bool] = False
 ) -> None:
@@ -57,6 +58,9 @@ def corr_matrix_plot(
         standardize_data: (Optional[bool], deafult=True)
             If true standardize the input data before plotting.
 
+        remove_outliers: (Optional[bool], default=True)
+            If true, outliers are removed from the dataframe.
+
         save_dir: (Optional[str], default=None)
             The path to the directory in which the plot is saved.
         
@@ -66,6 +70,9 @@ def corr_matrix_plot(
 
     if standardize_data:
         df = standardize(df, numerical_features)
+
+    if remove_outliers:
+        df = _exclude_outliers(df)
 
     corr = df[numerical_features].corr()
 
@@ -113,6 +120,7 @@ def pca_plots(
     df: pd.DataFrame,
     numerical_features: Iterable[str],
     standardize_data: Optional[bool] = True,
+    remove_outliers: Optional[bool] = True,
     save_dir: Optional[str] = None, 
     show: Optional[bool] = False
 ) -> None:
@@ -130,6 +138,9 @@ def pca_plots(
         standardize_data: (Optional[bool], deafult=True)
             If true standardize the input data before plotting.
 
+        remove_outliers: (Optional[bool], default=True)
+            If true, outliers are removed from the dataframe.
+
         save_dir: (Optional[str], default=None)
             The path to the directory in which the plot is saved.
         
@@ -140,6 +151,9 @@ def pca_plots(
     if save_dir:
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
+    
+    if remove_outliers:
+        df = _exclude_outliers(df)
 
     pca_data, pca_loadings, explained_var = apply_PCA(df, numerical_features, 2, standardize_data)
 
@@ -216,7 +230,8 @@ def pca_plots(
 def features_grid_kdplots(
     df: pd.DataFrame,
     features: Iterable[str],
-    units_of_measure: Iterable[str], 
+    units_of_measure: Iterable[str],
+    remove_outliers: Optional[bool] = True, 
     save_dir: Optional[str] = None, 
     show: Optional[bool] = False 
 ) -> None:
@@ -231,6 +246,9 @@ def features_grid_kdplots(
         features: (Iterable[str])
             A list of numerical features to plot.
 
+        remove_outliers: (Optional[bool], default=True)
+            If true, outliers are removed from the dataframe.
+
         units_of_measure: (Iterable[str])
             A collection of units of measure associated to the 
             features to plot.
@@ -241,6 +259,9 @@ def features_grid_kdplots(
         show: (Optional[bool], default=False)
             If `True` show the plot when calling the function.
     '''
+
+    if remove_outliers:
+        df = _exclude_outliers(df)
 
     tissues = df['tissue'].unique()
     tissue_types = df['tissue_type'].unique()
@@ -319,6 +340,7 @@ def features_grid_kdplots(
 #------------------------------------------------------------------------------------------------------------
 def num_neighbors_barplot(
     df: pd.DataFrame, 
+    remove_outliers: Optional[bool] = True,
     save_dir: Optional[str] = None, 
     show: Optional[bool] = False 
 ) -> None:
@@ -329,6 +351,9 @@ def num_neighbors_barplot(
     -----------
         df: (pd.DataFrame)
             The input dataframe.
+
+        remove_outliers: (Optional[bool], default=True)
+            If true, outliers are removed from the dataframe.
         
         save_dir: (Optional[str], default=None)
             The path to the directory in which the plot is saved.
@@ -337,6 +362,9 @@ def num_neighbors_barplot(
             If `True` show the plot when calling the function.
     '''
     
+    if remove_outliers:
+        df = _exclude_outliers(df)
+
     tissues = df['tissue'].unique()
     tissue_types = df['tissue_type'].unique()
     colors = sns.color_palette('viridis', len(tissues))
