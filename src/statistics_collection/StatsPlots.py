@@ -1,35 +1,36 @@
 import os
 import numpy as np
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+from matplotlib.colors import ListedColormap
 from scipy import stats
-from StatsAnalytics import standardize, apply_PCA, extract_numerical
-from typing import Optional, List, Tuple, Iterable, Literal
-
+from StatsAnalytics import standardize, apply_PCA, extract_numerical, _exclude_outliers
+from typing import Optional, List, Tuple, Iterable, Literal, Union
 
 
 #------------------------------------------------------------------------------------------------------------
-def _exclude_outliers(
-    df: pd.DataFrame,
-) -> pd.DataFrame:
+def create_cmap(
+    color_list: np.ndarray
+) -> ListedColormap:
     '''
-    Return a copy of the input dataframe without the records marked as outliers.
+    Creates a colormap for plots from a list of colors.
 
     Parameters:
     -----------
-        df: (pd.DataFrame)
-            The input dataframe. It must have an `is_outlier` boolean column,
-            which is `True` if the correspondent record should be removed.
+        color_list: (np.ndarray)
+            An Nx3 array of colors in RGB format.
 
     Returns:
     --------
-        out_df: (pd.DataFrame)
-            The input dataframe without outliers.  
+        A ListedColormap object to be used for plots.
     '''
 
-    out_df = df[~df['is_outlier']]
-    return out_df
+    return  ListedColormap(
+        colors=color_list,
+        name='cell_stats_cmap'
+    )
 
 #------------------------------------------------------------------------------------------------------------
 
@@ -41,6 +42,7 @@ def corr_matrix_plot(
     numerical_features: Iterable[str],
     standardize_data: Optional[bool] = True,
     remove_outliers: Optional[bool] = True,
+    color_map: Optional[Union[ListedColormap, str]] = 'viridis',  
     save_dir: Optional[str] = None, 
     show: Optional[bool] = False
 ) -> None:
@@ -60,6 +62,9 @@ def corr_matrix_plot(
 
         remove_outliers: (Optional[bool], default=True)
             If true, outliers are removed from the dataframe.
+        
+        color_map: (Optional[Union[ListedColormap, str]], default='viridis')
+            Either a pre-defined colormap or a user defined ListedColormap object.
 
         save_dir: (Optional[str], default=None)
             The path to the directory in which the plot is saved.
@@ -76,19 +81,23 @@ def corr_matrix_plot(
 
     corr = df[numerical_features].corr()
 
-    fig, ax = plt.figure(figsize=(24, 12))
+    fig = plt.figure(figsize=(24, 12))
+    ax = plt.subplot()
 
     sns.heatmap(
         corr, 
         vmin=-1, vmax=1, center=0,
-        cmap='viridis',
+        cmap=color_map,
         square=True,
         ax=ax,
-        cbar_kws={"shrink": .5}
+        cbar_kws={"shrink": 1}
     )
 
+    cbar = ax.collections[0].colorbar
+    cbar.ax.tick_params(labelsize=16)
+
     features = [
-        feature.title() 
+        feature.replace('_', ' ').title() 
         for feature in numerical_features
     ]
 
@@ -96,10 +105,10 @@ def corr_matrix_plot(
         features,
         rotation=45,
         horizontalalignment='right',
-        fontsize=12)
+        fontsize=20)
 
-    ax.set_title("Correlation Matrix", fontsize=24)
-    ax.set_yticklabels(features, fontsize=12)
+    ax.set_title("Correlation Matrix", fontsize=30, pad=25)
+    ax.set_yticklabels(features, fontsize=20)
 
     if save_dir:
         if not os.path.exists(save_dir):
@@ -121,6 +130,7 @@ def pca_plots(
     numerical_features: Iterable[str],
     standardize_data: Optional[bool] = True,
     remove_outliers: Optional[bool] = True,
+    color_map: Optional[Union[ListedColormap, str]] = 'viridis', 
     save_dir: Optional[str] = None, 
     show: Optional[bool] = False
 ) -> None:
@@ -141,6 +151,9 @@ def pca_plots(
         remove_outliers: (Optional[bool], default=True)
             If true, outliers are removed from the dataframe.
 
+        color_map: (Optional[Union[ListedColormap, str]], default='viridis')
+            Either a pre-defined colormap or a user defined ListedColormap object.
+
         save_dir: (Optional[str], default=None)
             The path to the directory in which the plot is saved.
         
@@ -152,16 +165,21 @@ def pca_plots(
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
     
+    if standardize_data:
+        df = standardize(df, numerical_features)
+    
     if remove_outliers:
-        df = _exclude_outliers(df)
+        df =  _exclude_outliers(df)
 
     pca_data, pca_loadings, explained_var = apply_PCA(df, numerical_features, 2, standardize_data)
 
     # PCA loadings Barplot
-    plt.rcParams['figure.figsize'] = [5, 9]
-    fig = plt.Figure()
+    fig = plt.figure(figsize=(8, 12))
 
-    features = [feature.title() for feature in numerical_features]
+    features = [
+        feature.replace('_', ' ').title() 
+        for feature in numerical_features
+    ]
 
     ax1 = plt.subplot(211)
     sns.barplot(
@@ -169,7 +187,7 @@ def pca_plots(
         y=pca_loadings[0],
         ax=ax1
     )
-    ax1.set_title("PC1 loadings", fontsize=22)
+    ax1.set_title("PC1 loadings", fontsize=28, pad=15)
     ax1.tick_params(axis='x', which='both', bottom=False, labelbottom=False)
 
     ax2 = plt.subplot(212)
@@ -178,11 +196,12 @@ def pca_plots(
         y=pca_loadings[1],
         ax=ax2
     )
-    ax2.set_title("PC2 loadings", fontsize=22)
-    ax2.tick_params(axis='x', labelrotation=60, labelsize=18)
+    ax2.set_title("PC2 loadings", fontsize=28, pad=15)
+    ax2.tick_params(axis='x', labelrotation=75, labelsize=18)
 
-    save_name = f"pca_loadings_barplots.jpg"
-    plt.savefig(os.path.join(save_dir, save_name), bbox_inches='tight', dpi=150) 
+    if save_dir:
+        save_name = f"pca_loadings_barplots.jpg"
+        plt.savefig(os.path.join(save_dir, save_name), bbox_inches='tight', dpi=150) 
 
     if show:
         plt.show()
@@ -191,31 +210,44 @@ def pca_plots(
 
     # PCA Scatterplot
     tissues = df['tissue'].unique()
+    tissue_types = df['tissue_type'].unique()
     tissue_to_float = dict(zip(tissues, np.linspace(0, 1, len(tissues))))
-    tissue_ids = [tissue_to_float[tissue] for tissue in tissues]
+    tissue_ids = [tissue_to_float[tissue] for tissue in df['tissue']]
 
-    fig, ax = plt.figure(figsize=(20, 8))
+    fig = plt.figure(figsize=(20, 12))
+    ax = plt.subplot()
 
     scatter = ax.scatter(
         x=pca_data[:, 0],
         y=pca_data[:, 1],
         c=tissue_ids,
-        cmap='viridis'
+        cmap=color_map
     )
 
-    ax.set_xlabel(f"PC1, explained variance = {round(explained_var[0], 3)}", fontsize=18)
-    ax.set_ylabel(f"PC2, explained variance = {round(explained_var[1], 3)}", fontsize=18)
-
-    ax.set_title("Principal Components Scatterplot", fontsize=28)
-
-    ax.legend(handles=scatter.legend_elements()[0], 
-        labels=list([f"Tissue: {name}" for name in tissues]),
-        loc="upper right",
+    ax.set_xlabel(
+        f"PC1, explained variance = {round(explained_var[0], 3)}", 
         fontsize=22
     )
+    ax.set_ylabel(
+        f"PC2, explained variance = {round(explained_var[1], 3)}", 
+        fontsize=22        
+    )
 
-    save_name = f"pca_scatterplot.jpg"
-    plt.savefig(os.path.join(save_dir, save_name), bbox_inches='tight', dpi=150) 
+    ax.set_title("Principal Components Scatterplot", fontsize=30, pad=15)
+
+    ax.legend(
+        handles=scatter.legend_elements()[0], 
+        labels=[
+            f"{name.replace('_', ' ').title()}: {t_type.replace('_', ' ')}" 
+            for name, t_type in zip(tissues, tissue_types)],
+        loc="upper right",
+        fontsize=22,
+        markerscale=3
+    )
+
+    if save_dir:
+        save_name = f"pca_scatterplot.jpg"
+        plt.savefig(os.path.join(save_dir, save_name), bbox_inches='tight', dpi=150) 
 
     if show:
         plt.show()
@@ -232,6 +264,7 @@ def features_grid_kdplots(
     features: Iterable[str],
     units_of_measure: Iterable[str],
     remove_outliers: Optional[bool] = True, 
+    color_map: Optional[Union[ListedColormap, str]] = 'viridis', 
     save_dir: Optional[str] = None, 
     show: Optional[bool] = False 
 ) -> None:
@@ -252,6 +285,9 @@ def features_grid_kdplots(
         units_of_measure: (Iterable[str])
             A collection of units of measure associated to the 
             features to plot.
+
+        color_map: (Optional[Union[ListedColormap, str]], default='viridis')
+            Either a pre-defined colormap or a user defined ListedColormap object.
         
         save_dir: (Optional[str], default=None)
             The path to the directory in which the plot is saved.
@@ -266,12 +302,25 @@ def features_grid_kdplots(
     tissues = df['tissue'].unique()
     tissue_types = df['tissue_type'].unique()
 
-    colors = sns.color_palette('viridis', len(tissues))
+    if isinstance(color_map, str):
+        colors = sns.color_palette(color_map, len(tissues))
+    elif isinstance(color_map, ListedColormap):
+        colors = color_map.colors
 
-    fig = plt.figure(figsize=(24, 12))
-    subplot_id = 1
+    fig = plt.figure(
+        figsize=(len(features)*5, len(tissues)*4),
+        constrained_layout=True
+    )
+    fig.suptitle("Morphological cell statistics comparison", fontsize=44)
+    subfigs = fig.subfigures(len(tissues), 1)
 
     for i, tissue in enumerate(tissues):
+        subfig = subfigs[i] 
+        subfig.suptitle(
+            f"{tissue.replace('_', ' ').title()}: {tissue_types[i].replace('_', ' ')}",
+            fontsize=36
+        )
+        subplot_id = 1
         for j, column in enumerate(features):
 
             # Find the max on the x and y-axes to have the same axes length
@@ -282,43 +331,55 @@ def features_grid_kdplots(
             unit_of_measure = units_of_measure[j]
 
             # Get the current axis object
-            ax = fig.add_subplot(len(tissues), len(features), subplot_id)
+            # ax = fig.add_subplot(len(tissues), len(features), subplot_id)
+            ax = subfig.add_subplot(1, len(features), subplot_id)
             subplot_id += 1
 
             # Subset the data for the current tissue
             tissue_df = df[df['tissue'] == tissue]
 
             # Map kernel density plot onto the axes, using shading and color
-            sns.kdeplot(data=tissue_df, x=column, fill=True, color=colors[i], ax=ax, clip=(0.0, max_x))
+            sns.kdeplot(
+                data=tissue_df, 
+                x=column, 
+                fill=True, 
+                color=colors[i], 
+                alpha=0.66,
+                ax=ax, 
+                clip=(0.0, max_x)
+            )
 
             # Map rugplot to the axes, using height to adjust the size of the ticks
-            sns.rugplot(data=tissue_df, x=column, height=0.125, color=colors[i], ax=ax)
-
-            # Set title and axes labels
-            if j == 0:
-                ax.set_title(f'{tissue.title()}: {tissue_types[i]}', fontsize=20)
+            sns.rugplot(
+                data=tissue_df, 
+                x=column, 
+                height=0.125, 
+                color=colors[i], 
+                ax=ax
+            )
 
             if unit_of_measure:
                 xlab = column.replace("_", " ").title() + f" ({unit_of_measure})"
             else:
                 xlab = column.replace("_", " ").title()
-            ax.set_xlabel(xlab, fontsize=20)
-            ax.set_ylabel('Density', fontsize=16)
 
-            # Remove y-axis ticks and set x and y-axis limits for the current plot
+            # Set x-axis stuff
+            if i == (len(tissues)-1):
+                ax.set_xlabel(xlab, fontsize=22)
+            else:
+                ax.set_xlabel("")
+                ax.set_xticks([])
+                ax.set_xlim([0, max_x])
+            
+            # Set y-axis stuff
+            ax.set_ylabel("")
             ax.set_yticks([])
-            ax.set_xlim([0, max_x])
-
+            if j == 0:
+                # ax.set_title(f'{tissue.title()}: {tissue_types[i]}', fontsize=24)
+                ax.set_ylabel('Density', fontsize=22)
+            
             # Remove the square around the plot
             sns.despine(left=False, bottom=False, top=True, right=True)
-
-            # Remove x-axis from the first 2 plots
-            if i < len(tissues)-1:
-                ax.set_xticks([])
-                ax.set_xlabel("")
-                ax.spines['bottom'].set_visible(False)
-
-    fig.suptitle("Morphological cell statistics comparison", fontsize=24)
 
     # Save the current plot
     if save_dir:
@@ -338,9 +399,10 @@ def features_grid_kdplots(
 
 
 #------------------------------------------------------------------------------------------------------------
-def num_neighbors_barplot(
+def num_neighbors_barplots(
     df: pd.DataFrame, 
     remove_outliers: Optional[bool] = True,
+    color_map: Optional[Union[ListedColormap, str]] = 'viridis',
     save_dir: Optional[str] = None, 
     show: Optional[bool] = False 
 ) -> None:
@@ -354,6 +416,9 @@ def num_neighbors_barplot(
 
         remove_outliers: (Optional[bool], default=True)
             If true, outliers are removed from the dataframe.
+
+        color_map: (Optional[Union[ListedColormap, str]], default='viridis')
+            Either a pre-defined colormap or a user defined ListedColormap object.
         
         save_dir: (Optional[str], default=None)
             The path to the directory in which the plot is saved.
@@ -367,12 +432,13 @@ def num_neighbors_barplot(
 
     tissues = df['tissue'].unique()
     tissue_types = df['tissue_type'].unique()
-    colors = sns.color_palette('viridis', len(tissues))
 
-    # Find the max on the x-axis to have the same axes length
-    max_x = max(df['num_neighbors']) + 1
+    if isinstance(color_map, str):
+        colors = sns.color_palette(color_map, len(tissues))
+    elif isinstance(color_map, ListedColormap):
+        colors = color_map.colors
 
-    fig = plt.figure(figsize=(20, 5))
+    fig = plt.figure(figsize=(len(tissues)*7, 5))
     subplot_id = 1
     for i, tissue in enumerate(tissues):
         # Get the current axis object
@@ -384,22 +450,36 @@ def num_neighbors_barplot(
 
         # Count the frequency of each unique value
         unique_values, counts = np.unique(data, return_counts=True)
+        
+        # Make unique_values and counts cover all the span
+        val_counts_dict = dict(zip(unique_values, counts))
+        for j in range(1, max(unique_values)):
+            if j not in unique_values:
+                val_counts_dict[j] = 0
 
         # Create a bar plot using Seaborn
-        sns.barplot(x=unique_values, y=counts, color=colors[i], ax=ax)
+        sns.barplot(
+            x=list(val_counts_dict.keys()), 
+            y=list(val_counts_dict.values()), 
+            color=colors[i], 
+            ax=ax
+        )
 
         # Set title and axes labels
         ax.set_title(f'{tissue.title()}: {tissue_types[i]}', fontsize=20)
-
+        max_x = max(data) + 1
         xlab = 'num_neighbors'.replace("_", " ").title()
-        ax.set_xlabel(np.arange(1, max(xlab)), fontsize=20)
-        ax.set_ylabel('Counts', fontsize=16)
+        ax.set_xlabel(xlab, fontsize=20)
         ax.set_xlim([0, max_x])
+        ax.set_xticks(list(val_counts_dict.keys()))
+        ax.set_xticklabels(list(val_counts_dict.keys()))
+        ax.set_ylabel('Counts', fontsize=16)
 
         # Remove the square around the plot
         sns.despine(left=False, bottom=False, top=True, right=True)
 
     fig.suptitle("Number of neighbors comparison", fontsize=24)
+    fig.subplots_adjust(top=0.8)
 
     # Save the current plot
     if save_dir:
@@ -423,21 +503,61 @@ def lewis_law_plots(
     df: pd.DataFrame, 
     feature: Literal['volume', 'area'] = 'volume',
     fit_degrees: Optional[Iterable[int]] = [1,2],
+    remove_outliers: Optional[bool] = True,
+    color_map: Optional[Union[ListedColormap, str]] = 'viridis',
     save_dir: Optional[str] = None,     
     show: Optional[bool] = False 
 ) -> None:
-    
-    # Create a separate figure for each tissue type in the data
+    '''
+    Make a plot of to empirically check the 3D Lewis Law across different tissues.
+
+    Parameters:
+    -----------
+        df: (pd.DataFrame)
+            The input dataframe.
+        
+        feature: (Literal['volume', 'area'], default='volume')
+            A string to specify whether to plot the Lewis Law for area or volume.
+        
+        fit_degrees: (Optional[Iterable[int]], default=[1,2])
+            The degree of the polynomial fitted on the data in the plots.
+
+        remove_outliers: (Optional[bool], default=True)
+            If true, outliers are removed from the dataframe.
+
+        color_map: (Optional[Union[ListedColormap, str]], default='viridis')
+            Either a pre-defined colormap or a user defined ListedColormap object.
+        
+        save_dir: (Optional[str], default=None)
+            The path to the directory in which the plot is saved.
+        
+        show: (Optional[bool], default=False)
+            If `True` show the plot when calling the function.
+    '''
+
+    if remove_outliers:
+        df = _exclude_outliers(df)   
+
     tissues = df['tissue'].unique()
     tissue_types = df['tissue_type'].unique()
-    colors = sns.color_palette('viridis', len(tissues))
+    
+    if isinstance(color_map, str):
+        colors = sns.color_palette(color_map, len(tissues))
+    elif isinstance(color_map, ListedColormap):
+        colors = color_map.colors
 
-    fig = plt.figure(figsize=(18, 6))
-    fig.suptitle(f"Lewis' Law for {feature.replace('_', ' ')}", fontsize=30)
+    fig = plt.figure(
+        figsize=(len(tissues)*6, 12),
+        constrained_layout=True
+    )
+    fig.suptitle(f"Lewis' Law for {feature.replace('_', ' ')}", fontsize=36)
     subplot_id = 1
     for i, tissue in enumerate(tissues):
         # Get the current axis object
-        ax = fig.add_subplot(1, len(tissues), subplot_id)
+        if len(tissues) <= 3:
+            ax = fig.add_subplot(1, len(tissues), subplot_id)
+        else:
+            ax = fig.add_subplot(2, int(np.ceil(len(tissues)/2)), subplot_id)
         subplot_id += 1
 
         # Subset the data for the current tissue
@@ -461,6 +581,7 @@ def lewis_law_plots(
         std_devs = list(local_sds.values())
 
         # Compute fitted lines
+        assert len(fit_degrees) == 2, 'Cannot fit more than 2 different degrees of polynomials.'
         x = np.asarray(list(local_avgs.keys()), dtype=np.int64)
         y = list(local_avgs.values())
         coeff_sets = [np.polyfit(x, y, degree) for degree in fit_degrees]
@@ -469,25 +590,24 @@ def lewis_law_plots(
         y_linear, y_quadratic = (polyline(x_fit) for polyline in polylines)
 
         # Plot the values and the fitted lines
-        # scatter = ax.scatter(x, y, c=colors[i])
         ax.errorbar(x, y, yerr=std_devs, fmt='o', color=colors[i], ecolor='grey', capsize=4)
         linear, = ax.plot(x_fit, y_linear, color='red', linestyle='--', label='Linear fit')   
         quadratic, = ax.plot(x_fit, y_quadratic, color='green', linestyle='-.', label='Quadratic fit')
 
         # Set title and axes labels
-        ax.set_title(f'{tissue.title()}: {tissue_types[i]}', fontsize=20)
-        ax.set_xlabel(r'Number of neighbors $(n)$', fontsize=20)
+        ax.set_title(f'{tissue.title()}: {tissue_types[i]}', fontsize=28)
+        ax.set_xlabel(r'Number of neighbors $(n)$', fontsize=24)
         if feature == 'volume':
-            ax.set_ylabel(r'$\bar{V}_n / \bar{V}$', fontsize=20)
+            ax.set_ylabel(r'$\bar{V}_n / \bar{V}$', fontsize=24)
         elif feature == 'surface_area':
-            ax.set_ylabel(r'$\bar{A}_n / \bar{A}$', fontsize=20)
+            ax.set_ylabel(r'$\bar{A}_n / \bar{A}$', fontsize=24)
         ax.set_xticks(x_fit)
-        ax.legend(handles=[linear, quadratic], loc='lower right')
+        ax.legend(handles=[linear, quadratic], loc='lower right', fontsize=18)
 
         # Remove the square around the plot
         sns.despine(left=False, bottom=False, top=True, right=True)
     
-    plt.subplots_adjust(top=0.8)
+    # plt.subplots_adjust(top=0.9)
 
     # Save the current plot
     if save_dir:
@@ -501,6 +621,5 @@ def lewis_law_plots(
         plt.show()
     else:
         plt.close()
-
 
 #------------------------------------------------------------------------------------------------------------

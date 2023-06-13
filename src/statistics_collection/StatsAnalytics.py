@@ -73,7 +73,7 @@ def _merge_dataframes(
 
 #------------------------------------------------------------------------------------------------------------
 def prepare_df(
-    paths_to_df: Iterable[str]
+    paths_to_dfs: Iterable[str]
 ) -> pd.DataFrame:
     '''
     Load dataframes relative to different samples from .csv files and 
@@ -91,16 +91,56 @@ def prepare_df(
 
     '''
 
-    dataframes = _load_dataframes(paths_to_df)
+    dataframes = _load_dataframes(paths_to_dfs)
     return _merge_dataframes(dataframes)
 
 #------------------------------------------------------------------------------------------------------------
 
 
+
+#------------------------------------------------------------------------------------------------------------
+def rename_features(
+    df: pd.DataFrame,
+    old_names: Iterable[str],
+    new_names: Iterable[str],
+) -> pd.DataFrame:
+    '''
+    Rename columns of the input dataframe.
+
+    Parameters:
+    -----------
+        df: (pd.DataFrame)
+            The cell statistics dataframe.
+
+        old_names: (Iterable[str])
+            An iterable storing the column names to change.
+        
+        new_names: (Iterable[str])
+            An iterable storing the new names to give to the columns.
+
+    Returns:
+    --------
+        out_df: (pd.Dataframe)
+            A copy of the input dataframe with modified names.
+    '''
+
+    out_df = df.copy()
+
+    for old_name, new_name in zip(old_names, new_names):
+        assert old_name in df.columns, f'Column {old_name} not in the dataframe.'
+        out_df[new_name] = out_df[old_name]
+    
+    out_df = out_df.drop(columns=old_names)
+    return out_df
+
+#------------------------------------------------------------------------------------------------------------
+
+
+
 #------------------------------------------------------------------------------------------------------------
 def _detect_volume_outliers(
     df: pd.DataFrame,
-    quantile_level: Optional[float] = 0.05,
+    quantile_level: Optional[float] = 0.025,
     lower_bound: Optional[float] = None,
     upper_bound: Optional[float] = None
 ) -> pd.DataFrame:
@@ -144,23 +184,22 @@ def _detect_volume_outliers(
             lower_bound = np.quantile(tissue_df["volume"][~np.isnan(df['volume'])], quantile_level)
             upper_bound = np.quantile(tissue_df["volume"][~np.isnan(df['volume'])], 1-quantile_level)
         
-        lower_volume_mask = df["volume"] < lower_bound
-        df['is_small_cell'] = np.logical_or(
-            df['is_small_cell'],
-            (df['tissue'] == tissue) * (lower_volume_mask)
-        )
-        upper_volume_mask = df["volume"] > upper_bound
-        df['is_large_cell'] = np.logical_or(
-            df['is_large_cell'],
-            (df['tissue'] == tissue) * (upper_volume_mask)
-        )
+        lower_volume_mask = np.logical_and((df['tissue'] == tissue), (df["volume"] < lower_bound))
+        df['is_small_cell'] = np.logical_or(df['is_small_cell'], lower_volume_mask)
+        # print(f'Lower bound: {lower_bound}')
+        # print(f'Lower mask: \n {lower_volume_mask}')
+        upper_volume_mask = np.logical_and((df['tissue'] == tissue), (df["volume"] > upper_bound))
+        df['is_large_cell'] = np.logical_or(df['is_large_cell'], upper_volume_mask)
+        # print(f'Upper bound: {upper_bound}')
+        # print(f'Upper mask: \n {upper_volume_mask}')
 
         num_upper_outliers = np.sum(upper_volume_mask)
         num_lower_outliers = np.sum(lower_volume_mask) 
+
         print(
         f'''\
-Found a total of {num_lower_outliers + num_upper_outliers} volume outliers,
-of which
+Found a total of {num_lower_outliers + num_upper_outliers} volume outliers in {tissue} sample,
+of which:
     - Below lower bound: {num_lower_outliers},
     - Above upper bound: {num_upper_outliers}. 
         '''
@@ -193,7 +232,7 @@ def detect_outliers(
             An iterable storing the names of methods used for outlier detection.
         
         inplace: (Optional[bool], default=False)
-            If False, return a copy. Otherwise, do operation inplace.
+            If False, return a copy. Otherwise, do operation in place.
     
         *args, **kwargs: 
             The parameters required by the currently selected methods.
@@ -225,6 +264,33 @@ def detect_outliers(
         out_df = df.copy()
         out_df['is_outlier'] = is_outlier
         return out_df
+
+#------------------------------------------------------------------------------------------------------------
+
+
+
+#------------------------------------------------------------------------------------------------------------
+def _exclude_outliers(
+    df: pd.DataFrame,
+) -> pd.DataFrame:
+    '''
+    Return a copy of the input dataframe without the records marked as outliers.
+    (Mainly used when computing summary statistics and plotting).
+
+    Parameters:
+    -----------
+        df: (pd.DataFrame)
+            The input dataframe. It must have an `is_outlier` boolean column,
+            which is `True` if the correspondent record should be removed.
+
+    Returns:
+    --------
+        out_df: (pd.DataFrame)
+            The input dataframe without outliers.  
+    '''
+
+    out_df = df[~df['is_outlier']]
+    return out_df
 
 #------------------------------------------------------------------------------------------------------------
 
@@ -275,7 +341,7 @@ def extract_numerical(
         len_before = len(numeric_df)
         numeric_df = numeric_df.dropna()
         len_after = len(numeric_df)
-        print(f'Dropped {len_after-len_before} records containing NAs.')
+        print(f'Dropped {len_before-len_after} records containing NAs.')
 
     return numeric_df
 
@@ -324,6 +390,7 @@ def standardize(
         scaled_values = scaler.fit_transform(df[numeric_features].values)
     except:
         raise ValueError(f'Chosen scaler `{scaler}` does not support fit_transform method.')
+    
     scaled_df = df.copy()
     scaled_df[numeric_features] = scaled_values
     
