@@ -16,6 +16,7 @@ We list here the content of this directory, giving a brief explanation of each f
 - `StatsPlots.py`: functions to get different plots.
 
 ## How to run
-
+- To run a single statistics collection you first need to set your parameters in the `config.json` file. Then it is sufficient to run the following: ``python path/to/run.py --config path/to/config/file``.
+- To run one or more parallel statistics collection on the cluster you need to set
 
 
