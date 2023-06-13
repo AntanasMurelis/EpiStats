@@ -22,6 +22,13 @@ We list here the content of this directory, giving a brief explanation of each f
 ## Output format
 The statistics collection pipeline automatically generates output directories with the follwing format:
 
+![Screenshot 2023-06-13 230257](https://github.com/AntanasMurelis/EpiStats/assets/74301866/36be0a26-b402-4982-b0d5-35c47315d5a4)
+
+- The name of the parent directory is taken from the file name of the input image and the letters `s`, `e`, `d` specify, respectively, the number of smoothing, erosion and dilation iterations performed.
+- The subdirectory `cell_meshes` contains the mesh files of all the cells in the sample. 
+- The subdirectory `cell_stats` contains the statistics dataframe in the `.csv` file format, and a subdirectory `cached_stats` containg `pickle` file of the statistics collected during the run, and that is used for backup purposes.
+- The `cut_cell_idxs.txt` just stores the indexes of the so-called cut cells (i.e. touching the image boundaries).
+- The `processed_label.tif` file stores the post-processed labeled 3D image. 
 
 ## About plots
 A jupyter notebook tutorial showing how the dataframes should be loaded and processed, and how to call plotting functions is reported in the directory `src/tutorial`.
