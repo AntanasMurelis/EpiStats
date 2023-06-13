@@ -623,3 +623,91 @@ def lewis_law_plots(
         plt.close()
 
 #------------------------------------------------------------------------------------------------------------
+
+
+
+#------------------------------------------------------------------------------------------------------------
+def violin_plots(
+    df: pd.DataFrame, 
+    tissue: str,
+    features: Iterable[str],
+    units_of_measure: Iterable[str],
+    remove_outliers: Optional[bool] = True,
+    color_map: Optional[Union[ListedColormap, str]] = 'viridis',
+    save_dir: Optional[str] = None, 
+    show: Optional[bool] = False 
+) -> None:
+    """
+    Generate violin plots to .
+
+    Parameters:
+    -----------
+        df: (pd.DataFrame)
+            The input dataframe.
+        
+        tissue: (str)
+            Specify the tissue to generate the plot for.
+
+        features: (Iterable[str])
+            A list of numerical features to plot.
+
+        units_of_measure: (Iterable[str])
+            The of units of measure associated to the features to plot.
+
+        remove_outliers: (Optional[bool], default=True)
+            If true, outliers are removed from the dataframe.
+
+        color_map: (Optional[Union[ListedColormap, str]], default='viridis')
+            Either a pre-defined colormap or a user defined ListedColormap object.
+        
+        save_dir: (Optional[str], default=None)
+            The path to the directory in which the plot is saved.
+        
+        show: (Optional[bool], default=False)
+            If `True` show the plot when calling the function.
+    """
+
+    if remove_outliers:
+        df = _exclude_outliers(df)  
+
+    sns.set(style="whitegrid")
+
+    tissue_df = df[df['tissue' == tissue]]
+    num_plots = len(features)
+    fig, axes = plt.subplots(1, num_plots, figsize=(5*num_plots, 10), sharey=False)
+    fig.suptitle(f'Morphological statistics distribution in {tissue} sample', fontsize=30)
+    fig.tight_layout(pad=6)
+
+    if isinstance(color_map, str):
+        colors = sns.color_palette(color_map, num_plots)
+    elif isinstance(color_map, ListedColormap):
+        colors = color_map.colors
+
+    for i, feature in enumerate(features):
+        data = tissue_df.loc[[feature]]
+        unit_of_measure = units_of_measure[i]
+        sns.violinplot(data=data, orient="v", cut=0, inner="quartile", ax=axes[i], color=colors[i])
+        sns.stripplot(data=data, color=".3", size=4, jitter=True, ax=axes[i])
+
+        axes[i].xaxis.set_tick_params(labelbottom=False)
+        if unit_of_measure:
+            xlab = f"{feature.replace('_', ' ').title()} ({units_of_measure[i]})"
+        else:
+            xlab = f"{feature.replace('_', ' ').title()}"
+        axes[i].set(xlabel=xlab)
+        axes[i].set_title("", pad=-15)
+
+    sns.despine(left=True)
+
+    # Save the current plot
+    if save_dir:
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+        save_name = f"{tissue}_violin_plot.jpg"
+        plt.savefig(os.path.join(save_dir, save_name), bbox_inches='tight', dpi=150) 
+
+    # Show the plot
+    if show:
+        plt.show()
+    else:
+        plt.close()
