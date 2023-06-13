@@ -17,6 +17,11 @@ We list here the content of this directory, giving a brief explanation of each f
 
 ## How to run
 - To run a single statistics collection you first need to set your parameters in the `config.json` file. Then it is sufficient to run the following: ``python path/to/run.py --config path/to/config/file``.
-- To run one or more parallel statistics collection on the cluster you need to set your parameters in the config file (except for `input_path`, `tissue`, and `voxel_size`, which depend on the sample, and hence have to be inserted in the appropriate space in the `submit_jobs.py` script). The generate a SLURM command  (e.g., `sbatch -n 1 --cpus-per-task=1 --time=4:00:00 --mem-per-cpu=1024 --wrap="python path/to/submit_jobs.py"`) and run it in the terminal. Before executing be careful that the paths to all the scripts and the config file in `submit_jobs.py` are correct.
+- To run one or more parallel statistics collection on the cluster you need to set your parameters in the config file (except for `input_path`, `tissue`, and `voxel_size`, which depend on the sample, and hence have to be inserted in the appropriate space in the `submit_jobs.py` script). The generate a SLURM command  (e.g., `sbatch -n 1 --cpus-per-task=1 --time=4:00:00 --mem-per-cpu=1024 --wrap="python path/to/submit_jobs.py"`) and run it in the terminal. Before executing be careful that the paths to all the scripts and the config file in `submit_jobs.py` are consistent.
 
+## Output format
+
+
+## About plots
+A jupyter notebook tutorial showing how the dataframes should be loaded and processed, and how to call plotting functions is reported in the directory `src/tutorial`.
 
