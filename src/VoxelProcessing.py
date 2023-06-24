@@ -5,7 +5,7 @@ from skimage.measure import regionprops
 import trimesh as tm
 import os
 from napari_process_points_and_surfaces import label_to_surface
-from misc import load_labeled_img, create_output_directory
+from statistics_collection.misc import load_labeled_img, create_output_directory
 
 
 
@@ -595,7 +595,8 @@ def full_label_processing(labeled_img, img_resolution, smoothing_iterations=5, e
     
     labeled_img = load_labeled_img(labeled_img)
     
-    output_directory = create_output_directory(output_folder, smoothing_iterations, erosion_iterations, dilation_iterations)
+    output_directory = create_output_directory(output_folder, '', smoothing_iterations, erosion_iterations,
+                                               dilation_iterations)
     
     preprocessed_labels = get_preprocessed_labels(labeled_img, preprocess, erosion_iterations, dilation_iterations, output_directory, overwrite)
     
