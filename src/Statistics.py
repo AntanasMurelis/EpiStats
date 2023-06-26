@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import trimesh as tm
 from scipy import ndimage
-from ExtendedTrimesh import ExtendedTrimesh
+from statistics_collection.ExtendedTrimesh import ExtendedTrimesh
 import os
 from Visualisation import generate_required_plots
 from tqdm import tqdm
