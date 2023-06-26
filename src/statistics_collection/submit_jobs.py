@@ -39,9 +39,9 @@ def create_slurm(
 #SBATCH -n 1
 #SBATCH --cpus-per-task={max_workers}
 #SBATCH --time=12:00:00
-#SBATCH --mem-per-cpu=10240
+#SBATCH --mem-per-cpu=16384
 
-python src/run.py --config {config_file}   
+python src/statistics_collection/run.py --config {config_file}   
     """
 
     script_file = f'submit_training_{name}.sh'
@@ -57,7 +57,7 @@ python src/run.py --config {config_file}
 
 
 #Read the config.json file
-with open("src/config.json", "r") as file:
+with open("src/statistics_collection/config.json", "r") as file:
     curr_config = json.load(file)
 
 #Set ranges of parameters to modify in the config
@@ -85,7 +85,7 @@ for tissue, voxel_size, input_path in zip(tissues, voxel_sizes ,input_paths):
     curr_config["input_path"] = input_path
     
     #save the new config dictionary
-    save_config_dir = './configs'
+    save_config_dir = './run_euler/configs'
     if not os.path.exists(save_config_dir):
         os.makedirs(save_config_dir)
     with open(os.path.join(save_config_dir, f"config_{tissue}.json"), "w") as f_out:
@@ -95,7 +95,8 @@ for tissue, voxel_size, input_path in zip(tissues, voxel_sizes ,input_paths):
     path_to_job_script = create_slurm(
         config_file=os.path.join(save_config_dir, f"config_{tissue}.json"), 
         name=tissue,
-        max_workers=curr_config["max_workers"]
+        max_workers=curr_config["max_workers"],
+        jobs_dir='./run_euler/jobs'
     )
     
     #execute the created job  
