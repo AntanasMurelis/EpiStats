@@ -229,8 +229,8 @@ class StatsCollector:
     ) -> None:
 
         if feature_name == '2D_statistics':
-            for i in range(2):
-                feat_names = ['neighbors_2D', 'area_2D']
+            for i in range(3):
+                feat_names = ['neighbors_2D', 'area_2D', 'slices']
                 #unpack the dictionary
                 feature_data = StatsCollector._unpack_feature_dict(feature_dict[i])
                 #add column to df

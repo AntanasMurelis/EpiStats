@@ -439,11 +439,13 @@ def compute_2D_statistics(
     # Unwrap the temporary data structures to have dictionaries indexes by label
     neighbors_2D_dict = defaultdict(list)
     area_2D_dict = defaultdict(list)
+    slices_dict = defaultdict(list)
     for slice_id in range(len(temp_area_2D)):
         for i, label in enumerate(temp_neighbors_2D[slice_id].keys()):
             neighbors_2D_dict[label].append(temp_neighbors_2D[slice_id][label])
             area_2D_dict[label].append(temp_area_2D[slice_id][i])
+            slices_dict[label].append(slice_id)
 
-    return dict(neighbors_2D_dict), dict(area_2D_dict)
+    return dict(neighbors_2D_dict), dict(area_2D_dict), dict(slices_dict)
 
 #------------------------------------------------------------------------------------------------------------
