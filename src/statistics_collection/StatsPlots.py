@@ -81,7 +81,7 @@ def corr_matrix_plot(
 
     corr = df[numerical_features].corr()
 
-    fig = plt.figure(figsize=(24, 12))
+    fig = plt.figure(figsize=(2*len(numerical_features), 1.5*len(numerical_features)))
     ax = plt.subplot()
 
     sns.heatmap(
@@ -174,7 +174,7 @@ def pca_plots(
     pca_data, pca_loadings, explained_var = apply_PCA(df, numerical_features, 2, standardize_data)
 
     # PCA loadings Barplot
-    fig = plt.figure(figsize=(8, 12))
+    fig = plt.figure(figsize=(6, 10))
 
     features = [
         feature.replace('_', ' ').title() 
@@ -214,7 +214,7 @@ def pca_plots(
     tissue_to_float = dict(zip(tissues, np.linspace(0, 1, len(tissues))))
     tissue_ids = [tissue_to_float[tissue] for tissue in df['tissue']]
 
-    fig = plt.figure(figsize=(20, 12))
+    fig = plt.figure(figsize=(16, 10))
     ax = plt.subplot()
 
     scatter = ax.scatter(
@@ -241,7 +241,7 @@ def pca_plots(
             f"{name.replace('_', ' ').title()}: {t_type.replace('_', ' ')}" 
             for name, t_type in zip(tissues, tissue_types)],
         loc="upper right",
-        fontsize=22,
+        fontsize=18,
         markerscale=3
     )
 
@@ -263,6 +263,7 @@ def features_grid_kdplots(
     df: pd.DataFrame,
     features: Iterable[str],
     units_of_measure: Iterable[str],
+    y_lims: Iterable[float],
     remove_outliers: Optional[bool] = True, 
     color_map: Optional[Union[ListedColormap, str]] = 'viridis', 
     save_dir: Optional[str] = None, 
@@ -279,12 +280,16 @@ def features_grid_kdplots(
         features: (Iterable[str])
             A list of numerical features to plot.
 
-        remove_outliers: (Optional[bool], default=True)
-            If true, outliers are removed from the dataframe.
-
         units_of_measure: (Iterable[str])
             A collection of units of measure associated to the 
             features to plot.
+        
+        y_lims: (Iterable[float])
+            A collection of floats that determines the y-axis upper limits
+            for all the features (to be set empirically). 
+
+        remove_outliers: (Optional[bool], default=True)
+            If true, outliers are removed from the dataframe.
 
         color_map: (Optional[Union[ListedColormap, str]], default='viridis')
             Either a pre-defined colormap or a user defined ListedColormap object.
@@ -325,7 +330,7 @@ def features_grid_kdplots(
 
             # Find the max on the x and y-axes to have the same axes length
             max_x = max(df[column])
-            max_x = max_x + 0.1*max_x
+            lim_x = max_x + 0.1*max_x
 
             # Get the unit of measure
             unit_of_measure = units_of_measure[j]
@@ -338,25 +343,45 @@ def features_grid_kdplots(
             # Subset the data for the current tissue
             tissue_df = df[df['tissue'] == tissue]
 
-            # Map kernel density plot onto the axes, using shading and color
-            sns.kdeplot(
-                data=tissue_df, 
-                x=column, 
-                fill=True, 
-                color=colors[i], 
-                alpha=0.66,
-                ax=ax, 
-                clip=(0.0, max_x)
-            )
+            if column != 'num_neighbors':
+                # Map kernel density plot onto the axes, using shading and color
+                sns.kdeplot(
+                    data=tissue_df, 
+                    x=column, 
+                    fill=True, 
+                    color=colors[i], 
+                    alpha=0.66,
+                    ax=ax, 
+                    clip=(0.0, lim_x)
+                )
 
-            # Map rugplot to the axes, using height to adjust the size of the ticks
-            sns.rugplot(
-                data=tissue_df, 
-                x=column, 
-                height=0.125, 
-                color=colors[i], 
-                ax=ax
-            )
+                # Map rugplot to the axes, using height to adjust the size of the ticks
+                sns.rugplot(
+                    data=tissue_df, 
+                    x=column, 
+                    height=0.125, 
+                    color=colors[i], 
+                    ax=ax
+                )
+            else:
+                # Count the frequency of each unique value
+                unique_values, counts = np.unique(tissue_df[column], return_counts=True)
+                
+                # Make unique_values and counts cover all the span
+                val_counts_dict = dict(zip(unique_values, counts/len(tissue_df)))
+                for k in range(1, max(unique_values)):
+                    if k not in unique_values:
+                        val_counts_dict[k] = 0
+
+                # Create a bar plot using Seaborn
+                sns.barplot(
+                    x=list(val_counts_dict.keys()), 
+                    y=list(val_counts_dict.values()), 
+                    color=colors[i], 
+                    ax=ax
+                )
+
+                ax.set_xticks(np.arange(0, max_x, 2))
 
             if unit_of_measure:
                 xlab = column.replace("_", " ").title() + f" ({unit_of_measure})"
@@ -364,22 +389,24 @@ def features_grid_kdplots(
                 xlab = column.replace("_", " ").title()
 
             # Set x-axis stuff
+            ax.set_xlim([0, lim_x])
             if i == (len(tissues)-1):
                 ax.set_xlabel(xlab, fontsize=22)
             else:
                 ax.set_xlabel("")
                 ax.set_xticks([])
-                ax.set_xlim([0, max_x])
             
             # Set y-axis stuff
             ax.set_ylabel("")
             ax.set_yticks([])
+            ax.set_ylim([0, y_lims[j]])
             if j == 0:
-                # ax.set_title(f'{tissue.title()}: {tissue_types[i]}', fontsize=24)
                 ax.set_ylabel('Density', fontsize=22)
             
             # Remove the square around the plot
             sns.despine(left=False, bottom=False, top=True, right=True)
+        
+        # Set common y-axis for a certain column
 
     # Save the current plot
     if save_dir:
@@ -546,6 +573,9 @@ def lewis_law_plots(
     elif isinstance(color_map, ListedColormap):
         colors = color_map.colors
 
+    min_x, max_x = min(df['num_neighbors'])-1, max(df['num_neighbors'])+1
+    max_y = 3.0
+
     fig = plt.figure(
         figsize=(len(tissues)*6, 12),
         constrained_layout=True
@@ -586,28 +616,42 @@ def lewis_law_plots(
         y = list(local_avgs.values())
         coeff_sets = [np.polyfit(x, y, degree) for degree in fit_degrees]
         polylines = [np.poly1d(coeff_set) for coeff_set in coeff_sets] 
-        x_fit = np.linspace(min(x), max(x), max(x)-min(x)+1, dtype=np.int32) 
+        x_fit = np.arange(min_x, max_x, dtype=np.int32) 
         y_linear, y_quadratic = (polyline(x_fit) for polyline in polylines)
 
         # Plot the values and the fitted lines
-        ax.errorbar(x, y, yerr=std_devs, fmt='o', color=colors[i], ecolor='grey', capsize=4)
-        linear, = ax.plot(x_fit, y_linear, color='red', linestyle='--', label='Linear fit')   
-        quadratic, = ax.plot(x_fit, y_quadratic, color='green', linestyle='-.', label='Quadratic fit')
+        ax.errorbar(x, y, yerr=std_devs, fmt='o', color=colors[i], ecolor='grey', capsize=8, markersize=10)
+        coeffs = [round(coeff, 2) for coeff in coeff_sets[0]]
+        linear, = ax.plot(
+            x_fit, y_linear, 
+            color='red', linestyle='--', 
+            label=f'Linear fit, coeff: {coeffs[0]}, {coeffs[1]}'
+        )
+        coeffs = [round(coeff, 2) for coeff in coeff_sets[1]]  
+        quadratic, = ax.plot(
+            x_fit, y_quadratic, 
+            color='green', linestyle='-.', 
+            label=f'Quadratic fit, coeff: {coeffs[0]}, {coeffs[1]}, {coeffs[2]}'
+        )
 
         # Set title and axes labels
-        ax.set_title(f'{tissue.title()}: {tissue_types[i]}', fontsize=28)
+        ax.set_title(f'{tissue.replace("_", " ").title()}: {tissue_types[i].replace("_", " ")}', fontsize=28)
         ax.set_xlabel(r'Number of neighbors $(n)$', fontsize=24)
         if feature == 'volume':
             ax.set_ylabel(r'$\bar{V}_n / \bar{V}$', fontsize=24)
         elif feature == 'surface_area':
             ax.set_ylabel(r'$\bar{A}_n / \bar{A}$', fontsize=24)
         ax.set_xticks(x_fit)
-        ax.legend(handles=[linear, quadratic], loc='lower right', fontsize=18)
+        ax.legend(handles=[linear, quadratic], loc='upper left', fontsize=16)
+
+        # # Set axes limits
+        ax.set_xlim([min_x, max_x])
+        ax.set_ylim([0, max_y])
 
         # Remove the square around the plot
         sns.despine(left=False, bottom=False, top=True, right=True)
     
-    # plt.subplots_adjust(top=0.9)
+    plt.subplots_adjust(top=0.8)
 
     # Save the current plot
     if save_dir:
