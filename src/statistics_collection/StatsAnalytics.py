@@ -1,8 +1,12 @@
 import numpy as np
 import pandas as pd
+import ast
+import re
+from tqdm import tqdm
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
-from typing import Optional, Iterable, Tuple, Union, Literal, Callable
+from collections import defaultdict
+from typing import Optional, Iterable, Tuple, Union, Literal, Callable, Dict
 
 
 
@@ -79,6 +83,7 @@ def prepare_df(
     '''
     Load dataframes relative to different samples from .csv files and 
     merge them in a single dataframe using previously defined functions.
+    Transform all the loaded features in the expected data type.
 
     Parameters:
     -----------
@@ -92,8 +97,20 @@ def prepare_df(
 
     '''
 
+    # Load and merge
     dataframes = _load_dataframes(paths_to_dfs)
-    return _merge_dataframes(dataframes)
+    merged_df = _merge_dataframes(dataframes)
+    
+    # Features saved as lists are loaded as 'str'. Convert them back to 'list' type
+    list_columns = [
+        'neighbors', 'neighbors_2D', 'area_2D', 
+        'contact_area_distribution', 'num_neighbors_2D', 'slices'
+    ]
+    for column in list_columns:
+        merged_df[column] = merged_df[column].apply(lambda x: re.sub(r'(\d)\s', r'\1,', x))
+        merged_df[column] = merged_df[column].apply(lambda x: ast.literal_eval(x))
+
+    return merged_df
 
 #------------------------------------------------------------------------------------------------------------
 
@@ -276,6 +293,7 @@ def _exclude_outliers(
 ) -> pd.DataFrame:
     '''
     Return a copy of the input dataframe without the records marked as outliers.
+    Also remove outlying cell indexes from neighbors lists.
     (Mainly used when computing summary statistics and plotting).
 
     Parameters:
@@ -290,7 +308,41 @@ def _exclude_outliers(
             The input dataframe without outliers.  
     '''
 
-    out_df = df[~df['is_outlier']]
+    if 'neighbors' in df.columns:
+        # Remove outlying indexes from neighbors lists
+        tissues = df['tissue'].unique()
+        for tissue in tissues:
+            tissue_df = df[df['tissue'] == tissue]
+            out_idxs = tissue_df[tissue_df['is_outlier']]['cell_ID'].values
+            for idx, row in tissue_df.iterrows():
+                if row['exclude_cell']:
+                    continue
+                else:
+                    # 3D neighbors
+                    mask = np.isin(np.asarray(row['neighbors']), out_idxs)
+                    # rm_idxs = np.where(mask)[0]
+                    tissue_df.at[idx, 'neighbors'] = list(np.asarray(row['neighbors'])[~mask])
+                    # for idx in rm_idxs:
+                    #     del tissue_df.loc[idx, 'neighbors'][idx]
+                    tissue_df.at[idx, 'num_neighbors'] -= np.sum(mask)
+                    # 2D neighbors
+                    new_neighs, new_num_neighs = [], []
+                    for neighs, num_neighs in zip(row['neighbors_2D'], row['num_neighbors_2D']):
+                        mask = np.isin(np.asarray(neighs), out_idxs)
+                        # rm_idxs = np.where(mask)[0]
+                        new_neighs.append(list(np.asarray(neighs)[~mask]))
+                        # for idx in rm_idxs:
+                        #     del neighs[idx]
+                        # new_neighs.append(neighs)
+                        new_num_neighs.append(num_neighs - np.sum(mask))
+                    tissue_df.at[idx, 'neighbors_2D'] = new_neighs
+                    tissue_df.at[idx, 'num_neighbors_2D'] = new_num_neighs
+            
+            df[df['tissue'] == tissue] = tissue_df
+
+    # Remove outlying records
+    out_df = df[~df['is_outlier']].copy()
+
     return out_df
 
 #------------------------------------------------------------------------------------------------------------
@@ -330,7 +382,7 @@ def extract_numerical(
 
     '''
     #keep only id features plus numerical ones
-    id_features = ['cell_ID', 'tissue', 'tissue_type', 'is_outlier']
+    id_features = ['cell_ID', 'tissue', 'tissue_type', 'exclude_cell', 'is_outlier']
     keep_features = id_features + numeric_features
     drop_features = [feat for feat in df.columns if feat not in keep_features]
 
@@ -457,3 +509,134 @@ def apply_PCA(
 
 #------------------------------------------------------------------------------------------------------------
 
+
+
+#------------------------------------------------------------------------------------------------------------
+def _get_lewis_law_2D_stats(
+    df: pd.DataFrame,
+    num_neighbors_lower_threshold: Optional[int] = 3,
+) -> Dict[str, Dict[int, Tuple[float, float]]]:
+    '''
+    Compute the statistics needed for checking 2D Lewis' Law.
+
+    Parameters:
+    -----------
+        df: (pd.DataFrame)
+            The dataframe to compute statistics from.
+        
+        num_neighbors_lower_threshold: (Optional[int], default=3)
+            The threshold under which a cell is excluded from computation.
+
+    Returns:
+    --------
+        lewis_law_dict: (Dict[str, Dict[int, Tuple[float, float]]])
+            A nested dictionary. The statistics computed for different tissues are
+            stored in different dictionaries, each associated to the correspondent tissue names key.
+            Each inner dictionary then has number of neighbors values as keys and tuples 
+            of normalized averages and standard errors as values.
+    '''
+
+    tissues = df['tissue'].unique()
+
+    # Gather cell 2D areas by tissue and by number of neighbors
+    stats_2D_dict = {}
+    for tissue in tissues:
+        tissue_df = df[df['tissue'] == tissue]
+        tissue_2D_dict = defaultdict(list)
+        for _, row in tissue_df.iterrows():
+            if row['exclude_cell']:
+                continue
+            else:
+                assert len(row['neighbors_2D']) == len(row['area_2D']), 'Bug in the 2D stats code!'
+                for area, num_neigh in zip(row['area_2D'], row['num_neighbors_2D']):
+                    if num_neigh < num_neighbors_lower_threshold:
+                        continue
+                    else:
+                        tissue_2D_dict[num_neigh].append(area)
+        stats_2D_dict[tissue] = tissue_2D_dict
+    
+    # Compute area averages
+    lewis_law_dict = {}
+    for tissue, tissue_dict in stats_2D_dict.items():
+        total_avg = np.sum([np.mean(areas)*len(areas) for areas in tissue_dict.values()])
+        total_avg = total_avg / np.sum([len(areas) for areas in tissue_dict.values()])
+        local_avgs = {num: np.mean(areas)/total_avg for num, areas in tissue_dict.items()}
+        local_errs = {num: np.std(areas/total_avg) for num, areas in tissue_dict.items()}
+        lewis_law_dict[tissue] = {num: (avg, err) for num, avg, err in zip(local_avgs.keys(), local_avgs.values(), local_errs.values())}
+    
+    return lewis_law_dict
+
+#------------------------------------------------------------------------------------------------------------
+
+
+
+#------------------------------------------------------------------------------------------------------------
+def _get_aboav_law_2D_stats(
+        df: pd.DataFrame,
+        num_neighbors_lower_threshold: Optional[int] = 3,
+        show_logs: Optional[bool] = False
+    ) -> Dict[str, Dict[int, float]]:
+    '''
+    Parameters:
+    -----------
+        df: (pd.DataFrame)
+            The dataframe to compute statistics from.
+        
+        num_neighbors_lower_threshold: (Optional[int], default=3)
+            The threshold under which a cell is excluded from computation.
+        
+        show_logs: (Optional[bool], deafult=False)
+            If true messages are print for debugging purpose.
+
+    Returns:
+    --------
+        aboav_law_dict: (Dict[str, Dict[int, Tuple[float, float]]])
+                A nested dictionary. The statistics computed for different tissues are stored 
+                in different dictionaries, each associated to the correspondent tissue names key.
+                Each inner dictionary then has number of neighbors values as keys and tuples 
+                of normalized averages and standard errors as values.
+    
+    '''
+    tissues = df['tissue'].unique()
+
+    aboav_law_dict = {}
+    for tissue in tissues:
+        print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+        print(f'TISSUE: {tissue}')
+        print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+        tissue_df = df[df['tissue'] == tissue]
+        tissue_dict = defaultdict(list)
+        for _, row in tqdm(tissue_df.iterrows(), total=len(tissue_df)):
+            if row['exclude_cell']:
+                continue
+            else:
+                if show_logs:
+                    print('---------------------------------------')
+                    print(f"cell_ID: {row['cell_ID']}")
+                for neighs, num_neighs, slc in zip(row['neighbors_2D'], row['num_neighbors_2D'], row['slices']):
+                    if show_logs:
+                        print(f'Curr slice: {slc}, neighbors: {neighs}, num neighbors: {num_neighs}')
+                    if num_neighs < num_neighbors_lower_threshold:
+                        continue
+                    else: 
+                        others_num_neighs = []
+                        for neigh in neighs:
+                            neigh_row = tissue_df[tissue_df['cell_ID'] == neigh]
+                            if neigh_row['exclude_cell'].bool(): #no complete neighborhood!
+                                break
+                            slice_idx = neigh_row['slices'].item().index(slc)
+                            others_num_neighs.append(neigh_row['num_neighbors_2D'].item()[slice_idx])
+                            if show_logs:    
+                                print(f"Current other: {neigh}, slice: {slc}, num neighbors: {neigh_row['num_neighbors_2D'].item()[slice_idx]}")
+
+                        if len(others_num_neighs) == num_neighs: 
+                            tissue_dict[num_neighs] = tissue_dict[num_neighs] + others_num_neighs
+                            if show_logs:
+                                print(f'Current tissue_dict: {tissue_dict}')
+
+        tissue_dict = dict(sorted(tissue_dict.items()))
+        if show_logs:
+            print(tissue_dict)
+        aboav_law_dict[tissue] = {k: (np.mean(v), np.std(v)/np.sqrt(len(v))) for k, v in tissue_dict.items()}
+
+    return aboav_law_dict

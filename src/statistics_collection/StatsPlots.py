@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib.colors import ListedColormap
 from scipy import stats
-from StatsAnalytics import standardize, apply_PCA, extract_numerical, _exclude_outliers
+from StatsAnalytics import standardize, apply_PCA, extract_numerical, _exclude_outliers, _get_lewis_law_2D_stats, _get_aboav_law_2D_stats
 from typing import Optional, List, Tuple, Iterable, Literal, Union
 
 
@@ -618,6 +618,8 @@ def lewis_law_plots(
         polylines = [np.poly1d(coeff_set) for coeff_set in coeff_sets] 
         x_fit = np.arange(min_x, max_x, dtype=np.int32) 
         y_linear, y_quadratic = (polyline(x_fit) for polyline in polylines)
+        y_th_linear = (x_fit - 2) / 4
+        y_th_quadratic = (x_fit / 6)**2
 
         # Plot the values and the fitted lines
         ax.errorbar(x, y, yerr=std_devs, fmt='o', color=colors[i], ecolor='grey', capsize=8, markersize=10)
@@ -625,14 +627,24 @@ def lewis_law_plots(
         linear, = ax.plot(
             x_fit, y_linear, 
             color='red', linestyle='--', 
-            label=f'Linear fit, coeff: {coeffs[0]}, {coeffs[1]}'
+            label=f'Linear fit, coeff: a={coeffs[1]}, b={coeffs[0]}'
         )
         coeffs = [round(coeff, 2) for coeff in coeff_sets[1]]  
         quadratic, = ax.plot(
             x_fit, y_quadratic, 
             color='green', linestyle='-.', 
-            label=f'Quadratic fit, coeff: {coeffs[0]}, {coeffs[1]}, {coeffs[2]}'
+            label=f'Quadratic fit, coeff: a={coeffs[2]}, b={coeffs[1]}, c={coeffs[0]}'
         )
+        th_linear, = ax.plot(
+            x_fit, y_th_linear,
+            color='orange', linestyle='--',
+            label=f"Theoretical linear fit"
+        )
+        th_quadratic, = ax.plot(
+            x_fit, y_th_quadratic,
+            color='blue', linestyle='-.',
+            label=f"Theoretical quadratic fit"
+        ) 
 
         # Set title and axes labels
         ax.set_title(f'{tissue.replace("_", " ").title()}: {tissue_types[i].replace("_", " ")}', fontsize=28)
@@ -642,7 +654,25 @@ def lewis_law_plots(
         elif feature == 'surface_area':
             ax.set_ylabel(r'$\bar{A}_n / \bar{A}$', fontsize=24)
         ax.set_xticks(x_fit)
-        ax.legend(handles=[linear, quadratic], loc='upper left', fontsize=16)
+        ax.legend(
+            handles=[linear, th_linear, quadratic, th_quadratic], 
+            loc='upper left', 
+            fontsize=16
+        )
+        ax.text(
+            x=19, 
+            y=0.15, 
+            s=(
+                r'Fitted line: $y=a+bx+c{x}^2$'
+                '\n'
+                r'Theoretical linear fit: $\bar{A}_n / \bar{A} = \frac{(n-2)}{4}$'
+                '\n'
+                r'Theoretical quadratic fit: $\bar{A}_n / \bar{A} \sim\ (\frac{n}{6})^2$'
+            ), 
+            style='italic', 
+            fontsize=12
+        )
+
 
         # # Set axes limits
         ax.set_xlim([min_x, max_x])
@@ -755,3 +785,280 @@ def violin_plots(
         plt.show()
     else:
         plt.close()
+#------------------------------------------------------------------------------------------------------------
+
+
+
+#------------------------------------------------------------------------------------------------------------
+def lewis_law_2D_plots(
+    df: pd.DataFrame, 
+    fit_degrees: Optional[Iterable[int]] = [1,2],
+    remove_outliers: Optional[bool] = True,
+    color_map: Optional[Union[ListedColormap, str]] = 'viridis',
+    save_dir: Optional[str] = None,     
+    show: Optional[bool] = False 
+) -> None:
+    '''
+    Make a plot of to empirically check the 2D Lewis Law across different slices of tissues.
+
+    Parameters:
+    -----------
+        df: (pd.DataFrame)
+            The input dataframe.
+        
+        fit_degrees: (Optional[Iterable[int]], default=[1,2])
+            The degree of the polynomial fitted on the data in the plots.
+
+        remove_outliers: (Optional[bool], default=True)
+            If true, outliers are removed from the dataframe.
+
+        color_map: (Optional[Union[ListedColormap, str]], default='viridis')
+            Either a pre-defined colormap or a user defined ListedColormap object.
+        
+        save_dir: (Optional[str], default=None)
+            The path to the directory in which the plot is saved.
+        
+        show: (Optional[bool], default=False)
+            If `True` show the plot when calling the function.
+    '''
+
+    if remove_outliers:
+        df = _exclude_outliers(df)   
+
+    tissues = df['tissue'].unique()
+    tissue_types = df['tissue_type'].unique()
+    
+    if isinstance(color_map, str):
+        colors = sns.color_palette(color_map, len(tissues))
+    elif isinstance(color_map, ListedColormap):
+        colors = color_map.colors
+
+    lewis_law_stats = _get_lewis_law_2D_stats(df)
+
+    min_x, max_x = 2, 16
+    max_y = 4.0
+
+    fig = plt.figure(
+        figsize=(len(tissues)*6, 12),
+        constrained_layout=True
+    )
+    fig.suptitle(f"Lewis' Law for 2D cell area", fontsize=36)
+    subplot_id = 1
+    for i, tissue in enumerate(tissues):
+        # Get the current axis object
+        if len(tissues) <= 3:
+            ax = fig.add_subplot(1, len(tissues), subplot_id)
+        else:
+            ax = fig.add_subplot(2, int(np.ceil(len(tissues)/2)), subplot_id)
+        subplot_id += 1
+
+        data = lewis_law_stats[tissue]
+        x = np.asarray(list(data.keys()), dtype=np.int64)
+        y_val = list([val[0] for val in data.values()])
+        y_err = list([val[1] for val in data.values()])
+        coeff_sets = [np.polyfit(x, y_val, degree) for degree in fit_degrees]
+        polylines = [np.poly1d(coeff_set) for coeff_set in coeff_sets] 
+        x_fit = np.arange(min_x, max_x, dtype=np.int32) 
+        y_linear, y_quadratic = (polyline(x_fit) for polyline in polylines)
+        y_th_linear = (x_fit - 2) / 4
+        y_th_quadratic = (x_fit / 6)**2
+
+        # Plot the values and the fitted lines
+        ax.errorbar(x, y_val, yerr=y_err, fmt='o', color=colors[i], ecolor='grey', capsize=8, markersize=10)
+        coeffs = [round(coeff, 2) for coeff in coeff_sets[0]]
+        linear, = ax.plot(
+            x_fit, y_linear, 
+            color='red', linestyle='--', 
+            label=f'Linear fit, coeff: a={coeffs[1]}, b={coeffs[0]}'
+        )
+        coeffs = [round(coeff, 2) for coeff in coeff_sets[1]]  
+        quadratic, = ax.plot(
+            x_fit, y_quadratic, 
+            color='green', linestyle='-.', 
+            label=f'Quadratic fit, coeff: a={coeffs[2]}, b={coeffs[1]}, c={coeffs[0]}'
+        )
+        th_linear, = ax.plot(
+            x_fit, y_th_linear,
+            color='orange', linestyle='--',
+            label=f"Theoretical linear fit"
+        )
+        th_quadratic, = ax.plot(
+            x_fit, y_th_quadratic,
+            color='blue', linestyle='-.',
+            label=f"Theoretical quadratic fit"
+        ) 
+
+        # Set title and axes labels
+        ax.set_title(f'{tissue.replace("_", " ").title()}: {tissue_types[i].replace("_", " ")}', fontsize=28)
+        ax.set_xlabel(r'Number of neighbors $(n)$', fontsize=24)
+        ax.set_ylabel(r'$\bar{A}_n / \bar{A}$', fontsize=24)
+        ax.set_xticks(x_fit)
+        ax.legend(
+            handles=[linear, th_linear, quadratic, th_quadratic], 
+            loc='upper left', 
+            fontsize=16
+        )
+        ax.text(
+            x=11, 
+            y=0.25, 
+            s=(
+                r'Fitted line: $y=a+bx+c{x}^2$'
+                '\n'
+                r'Theoretical linear fit: $\bar{A}_n / \bar{A} = \frac{(n-2)}{4}$'
+                '\n'
+                r'Theoretical quadratic fit: $\bar{A}_n / \bar{A} \sim\ (\frac{n}{6})^2$'
+            ), 
+            style='italic', 
+            fontsize=12
+        )
+
+        # Set axes limits
+        # ax.set_xlim([min_x, max_x])
+        ax.set_ylim([0, max_y])
+
+        # Remove the square around the plot
+        sns.despine(left=False, bottom=False, top=True, right=True)
+    
+    # plt.subplots_adjust(top=0.8)
+
+    # Save the current plot
+    if save_dir:
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+        save_name = f"lewis_law_2D_plots.jpg"
+        plt.savefig(os.path.join(save_dir, save_name), bbox_inches='tight', dpi=150) 
+
+    # Show the plot
+    if show:
+        plt.show()
+    else:
+        plt.close()
+
+#------------------------------------------------------------------------------------------------------------
+
+
+
+#------------------------------------------------------------------------------------------------------------
+def aboav_wearie_2D_plots(
+    df: pd.DataFrame,
+    remove_outliers: Optional[bool] = True,
+    color_map: Optional[Union[ListedColormap, str]] = 'viridis',
+    save_dir: Optional[str] = None,     
+    show: Optional[bool] = False 
+) -> None:
+    '''
+    Make a plot of to empirically check the 2D Lewis Law across different slices of tissues.
+
+    Parameters:
+    -----------
+        df: (pd.DataFrame)
+            The input dataframe.
+        
+        fit_degrees: (Optional[Iterable[int]], default=[1,2])
+            The degree of the polynomial fitted on the data in the plots.
+
+        remove_outliers: (Optional[bool], default=True)
+            If true, outliers are removed from the dataframe.
+
+        color_map: (Optional[Union[ListedColormap, str]], default='viridis')
+            Either a pre-defined colormap or a user defined ListedColormap object.
+        
+        save_dir: (Optional[str], default=None)
+            The path to the directory in which the plot is saved.
+        
+        show: (Optional[bool], default=False)
+            If `True` show the plot when calling the function.
+    '''
+
+    if remove_outliers:
+        df = _exclude_outliers(df)   
+
+    tissues = df['tissue'].unique()
+    tissue_types = df['tissue_type'].unique()
+    
+    if isinstance(color_map, str):
+        colors = sns.color_palette(color_map, len(tissues))
+    elif isinstance(color_map, ListedColormap):
+        colors = color_map.colors
+
+    aboav_law_stats = _get_aboav_law_2D_stats(df)
+
+    min_x, max_x = 2, 16
+    min_y, max_y = 10, 85
+
+    fig = plt.figure(
+        figsize=(len(tissues)*6, 12),
+        constrained_layout=True
+    )
+    fig.suptitle(f"Aboav-Weaire Law for 2D cell area", fontsize=36)
+    subplot_id = 1
+    for i, tissue in enumerate(tissues):
+        # Get the current axis object
+        if len(tissues) <= 3:
+            ax = fig.add_subplot(1, len(tissues), subplot_id)
+        else:
+            ax = fig.add_subplot(2, int(np.ceil(len(tissues)/2)), subplot_id)
+        subplot_id += 1
+
+        data = aboav_law_stats[tissue]
+        x = np.asarray(list(data.keys()), dtype=np.int64)
+        y_val = list([val[0] for val in data.values()])*x
+        y_err = list([val[1] for val in data.values()])*x
+        x_fit = np.arange(min_x, max_x, dtype=np.int32) 
+        y_th = 5*x_fit + 8
+        coeff_set = np.polyfit(x, y_val, 1)
+        polyline = np.poly1d(coeff_set) 
+        y_fit = polyline(x_fit)
+
+        # Plot the values and the fitted lines
+        ax.errorbar(x, y_val, yerr=y_err, fmt='o', color=colors[i], ecolor='grey', capsize=8, markersize=10)
+        theoretical, = ax.plot(
+            x_fit, y_th, 
+            color='blue', linestyle='-.', 
+            label=f'Theoretical line'
+        )
+        linear, = ax.plot(
+            x_fit, y_fit, 
+            color='red', linestyle='--', 
+            label=f'Linear fit, coeff: a={round(coeff_set[1], 2)}, b={round(coeff_set[0], 2)}'
+        )
+
+        # Set title and axes labels
+        ax.set_title(f'{tissue.replace("_", " ").title()}: {tissue_types[i].replace("_", " ")}', fontsize=28)
+        ax.set_xlabel(r'Number of neighbors $(n)$', fontsize=24)
+        ax.set_ylabel(r'${m_n}n$', fontsize=24)
+        ax.set_xticks(x_fit)
+        ax.legend(handles=[theoretical, linear], loc='upper left', fontsize=16)
+        ax.text(
+            x=11, 
+            y=25, 
+            s='Theoretical line eq: ${m_n}n = 8 + 5n$ \nFitted line eq: $y=a+bx$', 
+            style='italic', 
+            fontsize=12
+        )
+
+        # Set axes limits
+        ax.set_xlim([min_x, max_x])
+        ax.set_ylim([min_y, max_y])
+
+        # Remove the square around the plot
+        sns.despine(left=False, bottom=False, top=True, right=True)
+    
+    # plt.subplots_adjust(top=0.8)
+
+    # Save the current plot
+    if save_dir:
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+        save_name = f"aboav_law_2D_plots.jpg"
+        plt.savefig(os.path.join(save_dir, save_name), bbox_inches='tight', dpi=150) 
+
+    # Show the plot
+    if show:
+        plt.show()
+    else:
+        plt.close()
+
+#------------------------------------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------------------------------------
