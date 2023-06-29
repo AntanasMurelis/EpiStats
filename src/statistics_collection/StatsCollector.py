@@ -147,20 +147,28 @@ class StatsCollector:
         #         self.labels, self.output_dir
         #     )
         # elif 'stratified' in self.tissue_type:
-        #     idxs_edges = get_labels_touching_edges(
-        #         self.labels, self.output_dir
-        #     )
-        #     idxs_bg = get_labels_touching_background(
-        #         self.labels, self.output_dir
-        #     )
+            # idxs_edges = get_labels_touching_edges(
+            #     self.labels, self.output_dir
+            # )
+            # idxs_bg = get_labels_touching_background(
+            #     self.labels, self.output_dir
+            # )
         #     idxs_to_filter = np.union1d(idxs_edges, idxs_bg)
 
-        if self.tissue != 'embryo':
+        if self.tissue == 'embryo':
+            idxs_to_filter = []
+        elif self.tissue == 'lung':
+            idxs_edges = get_labels_touching_edges(
+                self.labels, self.output_dir
+            )
+            idxs_bg = get_labels_touching_background(
+                self.labels, self.output_dir
+            )
+            idxs_to_filter = np.union1d(idxs_edges, idxs_bg)
+        else:
             idxs_to_filter = get_labels_touching_edges(
                 self.labels, self.output_dir
             )
-        else:
-            idxs_to_filter = []
         
         return idxs_to_filter
         

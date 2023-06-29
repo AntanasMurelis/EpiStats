@@ -614,7 +614,16 @@ def lewis_law_plots(
         assert len(fit_degrees) == 2, 'Cannot fit more than 2 different degrees of polynomials.'
         x = np.asarray(list(local_avgs.keys()), dtype=np.int64)
         y = list(local_avgs.values())
-        coeff_sets = [np.polyfit(x, y, degree) for degree in fit_degrees]
+        fits = [np.polyfit(x, y, degree, cov=True) for degree in fit_degrees]
+        coeff_sets = [fit[0] for fit in fits]
+        std_err_sets = [np.sqrt(np.diag(fit[1])) for fit in fits] 
+        confint_width_sets = [
+            [
+                stats.t(df=len(x)-len(coeff_set)).ppf(0.975)*std_err
+                for coeff, std_err in zip(coeff_set, std_errs)
+            ]
+            for coeff_set, std_errs in zip(coeff_sets, std_err_sets)
+        ]
         polylines = [np.poly1d(coeff_set) for coeff_set in coeff_sets] 
         x_fit = np.arange(min_x, max_x, dtype=np.int32) 
         y_linear, y_quadratic = (polyline(x_fit) for polyline in polylines)
@@ -624,16 +633,18 @@ def lewis_law_plots(
         # Plot the values and the fitted lines
         ax.errorbar(x, y, yerr=std_devs, fmt='o', color=colors[i], ecolor='grey', capsize=8, markersize=10)
         coeffs = [round(coeff, 2) for coeff in coeff_sets[0]]
+        ci_widths = [round(ci_width, 2) for ci_width in confint_width_sets[0]]
         linear, = ax.plot(
             x_fit, y_linear, 
             color='red', linestyle='--', 
-            label=f'Linear fit, coeff: a={coeffs[1]}, b={coeffs[0]}'
+            label=f'Linear fit, coeff: a={coeffs[1]}\u00B1{ci_widths[1]}, b={coeffs[0]}\u00B1{ci_widths[0]}'
         )
         coeffs = [round(coeff, 2) for coeff in coeff_sets[1]]  
+        ci_widths = [round(ci_width, 2) for ci_width in confint_width_sets[1]]
         quadratic, = ax.plot(
             x_fit, y_quadratic, 
             color='green', linestyle='-.', 
-            label=f'Quadratic fit, coeff: a={coeffs[2]}, b={coeffs[1]}, c={coeffs[0]}'
+            label=f'Quadratic fit, coeff: a={coeffs[2]}\u00B1{ci_widths[2]}, b={coeffs[1]}\u00B1{ci_widths[1]}, c={coeffs[0]}\u00B1{ci_widths[0]}'
         )
         th_linear, = ax.plot(
             x_fit, y_th_linear,
@@ -696,95 +707,6 @@ def lewis_law_plots(
     else:
         plt.close()
 
-#------------------------------------------------------------------------------------------------------------
-
-
-
-#------------------------------------------------------------------------------------------------------------
-def violin_plots(
-    df: pd.DataFrame, 
-    tissue: str,
-    features: Iterable[str],
-    units_of_measure: Iterable[str],
-    remove_outliers: Optional[bool] = True,
-    color_map: Optional[Union[ListedColormap, str]] = 'viridis',
-    save_dir: Optional[str] = None, 
-    show: Optional[bool] = False 
-) -> None:
-    """
-    Generate violin plots to .
-
-    Parameters:
-    -----------
-        df: (pd.DataFrame)
-            The input dataframe.
-        
-        tissue: (str)
-            Specify the tissue to generate the plot for.
-
-        features: (Iterable[str])
-            A list of numerical features to plot.
-
-        units_of_measure: (Iterable[str])
-            The of units of measure associated to the features to plot.
-
-        remove_outliers: (Optional[bool], default=True)
-            If true, outliers are removed from the dataframe.
-
-        color_map: (Optional[Union[ListedColormap, str]], default='viridis')
-            Either a pre-defined colormap or a user defined ListedColormap object.
-        
-        save_dir: (Optional[str], default=None)
-            The path to the directory in which the plot is saved.
-        
-        show: (Optional[bool], default=False)
-            If `True` show the plot when calling the function.
-    """
-
-    if remove_outliers:
-        df = _exclude_outliers(df)  
-
-    sns.set(style="whitegrid")
-
-    tissue_df = df[df['tissue' == tissue]]
-    num_plots = len(features)
-    fig, axes = plt.subplots(1, num_plots, figsize=(5*num_plots, 10), sharey=False)
-    fig.suptitle(f'Morphological statistics distribution in {tissue} sample', fontsize=30)
-    fig.tight_layout(pad=6)
-
-    if isinstance(color_map, str):
-        colors = sns.color_palette(color_map, num_plots)
-    elif isinstance(color_map, ListedColormap):
-        colors = color_map.colors
-
-    for i, feature in enumerate(features):
-        data = tissue_df.loc[[feature]]
-        unit_of_measure = units_of_measure[i]
-        sns.violinplot(data=data, orient="v", cut=0, inner="quartile", ax=axes[i], color=colors[i])
-        sns.stripplot(data=data, color=".3", size=4, jitter=True, ax=axes[i])
-
-        axes[i].xaxis.set_tick_params(labelbottom=False)
-        if unit_of_measure:
-            xlab = f"{feature.replace('_', ' ').title()} ({units_of_measure[i]})"
-        else:
-            xlab = f"{feature.replace('_', ' ').title()}"
-        axes[i].set(xlabel=xlab)
-        axes[i].set_title("", pad=-15)
-
-    sns.despine(left=True)
-
-    # Save the current plot
-    if save_dir:
-        if not os.path.exists(save_dir):
-            os.makedirs(save_dir)
-        save_name = f"{tissue}_violin_plot.jpg"
-        plt.savefig(os.path.join(save_dir, save_name), bbox_inches='tight', dpi=150) 
-
-    # Show the plot
-    if show:
-        plt.show()
-    else:
-        plt.close()
 #------------------------------------------------------------------------------------------------------------
 
 
@@ -856,7 +778,16 @@ def lewis_law_2D_plots(
         x = np.asarray(list(data.keys()), dtype=np.int64)
         y_val = list([val[0] for val in data.values()])
         y_err = list([val[1] for val in data.values()])
-        coeff_sets = [np.polyfit(x, y_val, degree) for degree in fit_degrees]
+        fits = [np.polyfit(x, y_val, degree, cov=True) for degree in fit_degrees]
+        coeff_sets = [fit[0] for fit in fits]
+        std_err_sets = [np.sqrt(np.diag(fit[1])) for fit in fits] 
+        confint_width_sets = [
+            [
+                stats.t(df=len(x)-len(coeff_set)).ppf(0.975)*std_err
+                for coeff, std_err in zip(coeff_set, std_errs)
+            ]
+            for coeff_set, std_errs in zip(coeff_sets, std_err_sets)
+        ]
         polylines = [np.poly1d(coeff_set) for coeff_set in coeff_sets] 
         x_fit = np.arange(min_x, max_x, dtype=np.int32) 
         y_linear, y_quadratic = (polyline(x_fit) for polyline in polylines)
@@ -866,16 +797,18 @@ def lewis_law_2D_plots(
         # Plot the values and the fitted lines
         ax.errorbar(x, y_val, yerr=y_err, fmt='o', color=colors[i], ecolor='grey', capsize=8, markersize=10)
         coeffs = [round(coeff, 2) for coeff in coeff_sets[0]]
+        ci_widths = [round(ci_width, 2) for ci_width in confint_width_sets[0]]
         linear, = ax.plot(
             x_fit, y_linear, 
             color='red', linestyle='--', 
-            label=f'Linear fit, coeff: a={coeffs[1]}, b={coeffs[0]}'
+            label=f'Linear fit, coeff: a={coeffs[1]}\u00B1{ci_widths[1]}, b={coeffs[0]}\u00B1{ci_widths[0]}'
         )
         coeffs = [round(coeff, 2) for coeff in coeff_sets[1]]  
+        ci_widths = [round(ci_width, 2) for ci_width in confint_width_sets[1]]
         quadratic, = ax.plot(
             x_fit, y_quadratic, 
             color='green', linestyle='-.', 
-            label=f'Quadratic fit, coeff: a={coeffs[2]}, b={coeffs[1]}, c={coeffs[0]}'
+            label=f'Quadratic fit, coeff: a={coeffs[2]}\u00B1{ci_widths[2]}, b={coeffs[1]}\u00B1{ci_widths[1]}, c={coeffs[0]}\u00B1{ci_widths[0]}'
         )
         th_linear, = ax.plot(
             x_fit, y_th_linear,
@@ -1061,4 +994,92 @@ def aboav_wearie_2D_plots(
 
 #------------------------------------------------------------------------------------------------------------
 
+
+
+#------------------------------------------------------------------------------------------------------------
+def violin_plots(
+    df: pd.DataFrame, 
+    tissue: str,
+    features: Iterable[str],
+    units_of_measure: Iterable[str],
+    remove_outliers: Optional[bool] = True,
+    color_map: Optional[Union[ListedColormap, str]] = 'viridis',
+    save_dir: Optional[str] = None, 
+    show: Optional[bool] = False 
+) -> None:
+    """
+    Generate violin plots to .
+
+    Parameters:
+    -----------
+        df: (pd.DataFrame)
+            The input dataframe.
+        
+        tissue: (str)
+            Specify the tissue to generate the plot for.
+
+        features: (Iterable[str])
+            A list of numerical features to plot.
+
+        units_of_measure: (Iterable[str])
+            The of units of measure associated to the features to plot.
+
+        remove_outliers: (Optional[bool], default=True)
+            If true, outliers are removed from the dataframe.
+
+        color_map: (Optional[Union[ListedColormap, str]], default='viridis')
+            Either a pre-defined colormap or a user defined ListedColormap object.
+        
+        save_dir: (Optional[str], default=None)
+            The path to the directory in which the plot is saved.
+        
+        show: (Optional[bool], default=False)
+            If `True` show the plot when calling the function.
+    """
+
+    if remove_outliers:
+        df = _exclude_outliers(df)  
+
+    sns.set(style="whitegrid")
+
+    tissue_df = df[df['tissue' == tissue]]
+    num_plots = len(features)
+    fig, axes = plt.subplots(1, num_plots, figsize=(5*num_plots, 10), sharey=False)
+    fig.suptitle(f'Morphological statistics distribution in {tissue} sample', fontsize=30)
+    fig.tight_layout(pad=6)
+
+    if isinstance(color_map, str):
+        colors = sns.color_palette(color_map, num_plots)
+    elif isinstance(color_map, ListedColormap):
+        colors = color_map.colors
+
+    for i, feature in enumerate(features):
+        data = tissue_df.loc[[feature]]
+        unit_of_measure = units_of_measure[i]
+        sns.violinplot(data=data, orient="v", cut=0, inner="quartile", ax=axes[i], color=colors[i])
+        sns.stripplot(data=data, color=".3", size=4, jitter=True, ax=axes[i])
+
+        axes[i].xaxis.set_tick_params(labelbottom=False)
+        if unit_of_measure:
+            xlab = f"{feature.replace('_', ' ').title()} ({units_of_measure[i]})"
+        else:
+            xlab = f"{feature.replace('_', ' ').title()}"
+        axes[i].set(xlabel=xlab)
+        axes[i].set_title("", pad=-15)
+
+    sns.despine(left=True)
+
+    # Save the current plot
+    if save_dir:
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+        save_name = f"{tissue}_violin_plot.jpg"
+        plt.savefig(os.path.join(save_dir, save_name), bbox_inches='tight', dpi=150) 
+
+    # Show the plot
+    if show:
+        plt.show()
+    else:
+        plt.close()
+#------------------------------------------------------------------------------------------------------------
 #------------------------------------------------------------------------------------------------------------
