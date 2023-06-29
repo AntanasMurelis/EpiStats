@@ -152,7 +152,7 @@ def get_labels_touching_background(
         labels_touching_background.update(curr_labels_touching)
     
     # Convert labels list into numpy array
-    labels_touching_background = np.asarray(labels_touching_background, dtype=np.uint16)
+    labels_touching_background = np.asarray(list(labels_touching_background), dtype=np.uint16)
     
     if output_directory:
         if not os.path.exists(output_directory): os.makedirs(output_directory)
