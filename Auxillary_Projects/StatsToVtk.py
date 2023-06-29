@@ -372,17 +372,16 @@ def neighbor_color(mesh_file, contact_faces, output_vtk):
 
 if __name__ == '__main__':
     
-    
     # # Replace these with the appropriate paths
     output_dir = '/Users/antanas/BC_Project/No_Edge_5000/No_edge2/Validated_labels_Antanas_Control_s_10_e_2_d_3'
-    statistic_column = 'cell_volume'
+    statistic_column = 'cell_isoperimentric_ratio'
     
     mesh_dir = os.path.join(output_dir, 'cell_meshes')
     statistics_csv = os.path.join(output_dir, 'all_cell_statistics.csv')
 
-    # cell_id = 32
-    # contact_faces = get_contact_faces(cell_id, statistics_csv, mesh_dir, distance = 0.6)
+    cell_id = 80
+    contact_faces = get_contact_faces(cell_id, statistics_csv, mesh_dir, distance = 0.7)
     
-    # neighbor_color(os.path.join(mesh_dir, f'cell_{cell_id - 1}.stl'), contact_faces, os.path.join(output_dir, f'cell_{cell_id - 1}.vtk'))
+    neighbor_color(os.path.join(mesh_dir, f'cell_{cell_id - 1}.stl'), contact_faces, os.path.join(output_dir, f'cell_{cell_id - 1}.vtk'))
     #visualize_statistics(mesh_dir, statistics_csv, statistic_column)
-    create_vtk_file(mesh_dir, statistics_csv,f'{output_dir}/BC_Antanas_Control_all_{statistic_column}.vtm')
+    #create_vtk_file(mesh_dir, statistics_csv,f'{output_dir}/BC_Franzi_Control_filtered_{statistic_column}.vtm')
