@@ -159,10 +159,14 @@ class StatsCollector:
             idxs_to_filter = []
         elif self.tissue == 'lung':
             idxs_edges = get_labels_touching_edges(
-                self.labels, self.output_dir
+                self.labels, 
+                self.output_dir
             )
             idxs_bg = get_labels_touching_background(
-                self.labels, self.output_dir
+                self.labels, 
+                self.slicing_dim,
+                self.output_dir,
+                0.1
             )
             idxs_to_filter = np.union1d(idxs_edges, idxs_bg)
         else:
