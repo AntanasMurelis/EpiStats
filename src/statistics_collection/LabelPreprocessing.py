@@ -68,8 +68,9 @@ def remove_unconnected_regions(
 #-----------------------------------------------------------------------------------------------------------------------------
 def get_labels_touching_background(
         labeled_img: np.ndarray[int], 
+        slicing_dim: int, 
         output_directory: Optional[str] = None,
-        threshold: Optional[int] = 0
+        threshold: Optional[float] = 0.5
     ) -> Tuple[np.ndarray[int], Dict[int, int]]:
     """
     Remove all labels that touch the background (label 0) more than the specified threshold.
@@ -80,12 +81,15 @@ def get_labels_touching_background(
         The input 3D labeled image, where the background has a label of 0 and other objects have 
         positive integer labels.
 
-    output_directory: (str)
+    slicing_dim: (int)
+        The dimension along which slices are taken.
+
+    output_directory: (str, default=None)
         Name of the folder where the labels indexes will be saved.
         If None nothing will be saved.
 
-    threshold: (int, optional, default=0)
-        The minimum number of background pixels a label must touch to be removed.
+    threshold: (float, optional, default=0.5)
+        The minimum relative number of background pixels a label must touch to be removed.
 
     Returns:
     --------
@@ -95,35 +99,57 @@ def get_labels_touching_background(
     background_touch_counts: (dict)
         A dictionary that associates to each label in 'labeled_img' the number of voxels in touch with the background.
     """
-    # Find the unique labels in the labeled image
-    unique_labels = np.unique(labeled_img)
+    
+    # Change axis order putting the slicing axis first    
+    if slicing_dim == 0:
+        reordering_expr = 'ijk->ijk'
+    elif slicing_dim == 1:
+        reordering_expr = 'ijk->jik'
+    elif slicing_dim == 2: 
+        reordering_expr = 'ijk->kij'
+    else:
+        raise ValueError('Labeled image is 3D, so slicing_dim must be either 0, 1, or 2.')
 
-    # Pad the input labeled image with a single layer of background pixels (label 0)
-    padded_labeled_img = np.pad(labeled_img, pad_width=10, mode='constant', constant_values=0)
+    reordered_labeled_img = np.einsum(reordering_expr, labeled_img)
 
-    # Initialize lists to store labels touching background and counts of background touching voxels
-    labels_touching_background = []
+    labels_touching_background = set()
     background_touch_counts = {} 
 
-    # Iterate through the unique labels, excluding the background label (0)
-    for label in tqdm(unique_labels[1:], desc="Checking labels touching background: "):
-        # Create a binary image for the current label
-        binary_img = padded_labeled_img == label
+    for labeled_slice in tqdm(reordered_labeled_img):
+        # Find the unique labels in the labeled slice
+        unique_labels = np.unique(labeled_slice)
 
-        # Dilate the binary image by one voxel to find the border of the label
-        dilated_binary_img = ndimage.binary_dilation(binary_img)
+        # Pad the labeled slice with a single layer of background pixels (label 0)
+        padded_labeled_img = np.pad(labeled_slice, pad_width=10, mode='constant', constant_values=0)
 
-        # Find the border by XOR operation between the dilated and original binary images
-        border_binary_img = dilated_binary_img ^ binary_img
+        # Initialize lists to store labels touching background and counts of background touching voxels
+        curr_labels_touching = []
 
-        # Count the number of background pixels (label 0) touching the border
-        background_touch_count = np.sum(padded_labeled_img[border_binary_img] == 0)
-        background_touch_counts[label] = background_touch_count
+        # Iterate through the unique labels, excluding the background label (0)
+        # for label in tqdm(unique_labels[1:], desc="Checking labels touching background: "):
+        for label in unique_labels[1:]:
+            # Create a binary image for the current label
+            binary_img = padded_labeled_img == label
 
-        # Check if the background touch count is greater than the threshold
-        if background_touch_count > threshold:
-            # Add label to the list of labels touching background
-            labels_touching_background.append(label)
+            # Dilate the binary image by one voxel to find the border of the label
+            dilated_binary_img = ndimage.binary_dilation(binary_img)
+
+            # Find the border by XOR operation between the dilated and original binary images
+            border_binary_img = dilated_binary_img ^ binary_img
+
+            # Count the number of background pixels (label 0) touching the border
+            border_labeled_img = padded_labeled_img[border_binary_img]
+            background_touch_count = np.sum(border_labeled_img == 0) / len(border_labeled_img)
+            background_touch_counts.setdefault(label, 0)
+            background_touch_counts[label] += background_touch_count
+
+            # Check if the background touch count is greater than the threshold
+            if background_touch_count > threshold:
+                # Add label to the list of labels touching background
+                curr_labels_touching.append(label)
+
+        # Update the overall labels tracker
+        labels_touching_background.update(curr_labels_touching)
     
     # Convert labels list into numpy array
     labels_touching_background = np.asarray(labels_touching_background, dtype=np.uint16)
