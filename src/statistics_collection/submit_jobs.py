@@ -61,19 +61,21 @@ with open("src/statistics_collection/config.json", "r") as file:
     curr_config = json.load(file)
 
 #Set ranges of parameters to modify in the config
-tissues = ['intestine_villus', 'lung_bronchiole', 'bladder', 'esophagus']
+tissues = ['intestine_villus', 'lung_bronchiole', 'bladder', 'esophagus', 'lung']
 voxel_sizes = [
     [0.325, 0.325, 0.25],
     [0.1625, 0.1625, 0.25],
     [0.21, 0.21, 0.39],
-    [0.1625, 0.1625, 0.25]
+    [0.1625, 0.1625, 0.25],
+    [0.1, 0.1, 0.1]
 ]
 COMMON_ROOT = './curated_labels/'
 input_files = [
     'intestine_sample2_b_curated_segmentation_relabel_seq.tif',
     'lung_new_sample_b_curated_segmentation_central_crop_relabel_seq.tif',
     'bladder_control_curated_segmentation.tif',
-    'esophagus_Z2_curated_crop.tif'
+    'esophagus_Z2_curated_crop.tif',
+    'lung_pseudostratified_from_harold.tif'
 ]
 input_paths = [os.path.join(COMMON_ROOT, input_file) for input_file in input_files]
 

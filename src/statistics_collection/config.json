@@ -1,6 +1,6 @@
 {
-    "input_path": "../../curated_labels/bladder_control_curated_segmentation.tif",
-    "output_path": "./output",
+    "input_path": "./curated_labels/bladder_control_curated_segmentation.tif",
+    "output_path": "./run_euler/outputs/output",
     "tissue": "bladder",
     "erosion_iters": 6,
     "dilation_iters": 8,
@@ -12,3 +12,4 @@
     "features": ["area", "volume", "elongation_and_axes", "neighbors", "contact_area"],
     "load_from_cache": false
 }
+

@@ -136,33 +136,20 @@ class StatsCollector:
 
     @staticmethod
     def _tissue_to_type_dict() -> Dict[str, str]:
-        tissues = ['bladder', 'intestine_villus', 'lung_bronchiole', 'esophagus', 'embryo']
-        tissue_types = ['stratified_transitional', 'simple_columnar', 'simple_cuboidal', 'stratified_squamous', 'Undefined']
+        tissues = ['bladder', 'intestine_villus', 'lung_bronchiole', 'esophagus', 'embryo', 'lung']
+        tissue_types = ['stratified_transitional', 'simple_columnar', 'simple_cuboidal', 'stratified_squamous', 'Undefined', 'pseudostratified']
 
         return dict(zip(tissues, tissue_types))
     
     @staticmethod
     def _tissue_to_slicing_dim_dict() -> Dict[str, int]:
-        tissues = ['bladder', 'intestine_villus', 'lung_bronchiole', 'esophagus', 'embryo']
-        slicing_dims = [1, 0, 2, 1, 0]
+        tissues = ['bladder', 'intestine_villus', 'lung_bronchiole', 'esophagus', 'embryo', 'lung']
+        slicing_dims = [1, 0, 2, 1, 0, 2]
 
         return dict(zip(tissues, slicing_dims))
     
     
     def filter_cells(self) -> List[int]:
-        # if 'simple' in self.tissue_type:
-        #     idxs_to_filter = get_labels_touching_edges(
-        #         self.labels, self.output_dir
-        #     )
-        # elif 'stratified' in self.tissue_type:
-            # idxs_edges = get_labels_touching_edges(
-            #     self.labels, self.output_dir
-            # )
-            # idxs_bg = get_labels_touching_background(
-            #     self.labels, self.output_dir
-            # )
-        #     idxs_to_filter = np.union1d(idxs_edges, idxs_bg)
-
         if self.tissue == 'embryo':
             idxs_to_filter = []
         elif self.tissue == 'lung':
@@ -170,13 +157,13 @@ class StatsCollector:
                 self.labels, 
                 self.output_dir
             )
-            idxs_bg = get_labels_touching_background(
+            idxs_bg, _ = get_labels_touching_background(
                 self.labels, 
                 self.slicing_dim,
                 self.output_dir,
                 0.1
             )
-            idxs_to_filter = np.union1d(idxs_edges, idxs_bg)
+            idxs_to_filter = np.logical_or(idxs_edges, idxs_bg)
         else:
             idxs_to_filter = get_labels_touching_edges(
                 self.labels, self.output_dir
