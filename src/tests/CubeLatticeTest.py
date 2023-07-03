@@ -61,7 +61,7 @@ def add_cube_to_image(
     assert y_voxel_end <= voxel_img.shape[1], "y_voxel_end must be smaller than the size of the image in y axis"
     assert z_voxel_end <= voxel_img.shape[2], "z_voxel_end must be smaller than the size of the image in z axis"
 
-    voxel_img[x_voxel_start:x_voxel_end-1, y_voxel_start:y_voxel_end-1, z_voxel_start:z_voxel_end-1] = cube_label
+    voxel_img[x_voxel_start:x_voxel_end, y_voxel_start:y_voxel_end, z_voxel_start:z_voxel_end] = cube_label
     return voxel_img
 #------------------------------------------------------------------------------------------------------------
 

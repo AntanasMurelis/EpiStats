@@ -9,6 +9,14 @@ from collections import defaultdict
 from typing import Optional, List, Tuple, Iterable, Dict, Union
 from ExtendedTrimesh import ExtendedTrimesh
 import napari
+from scipy.spatial.transform import Rotation
+from typing import Union, Optional, Iterable, List, Tuple
+from morphosamplers.sampler import (
+    generate_2d_grid,
+    place_sampling_grids,
+    sample_volume_at_coordinates,
+)
+from skimage.measure import regionprops
 
 
 #------------------------------------------------------------------------------------------------------------
@@ -448,4 +456,202 @@ def compute_2D_statistics(
 
     return dict(neighbors_2D_dict), dict(area_2D_dict), dict(slices_dict)
 
+#------------------------------------------------------------------------------------------------------------
+
+
+
+#------------------------------------------------------------------------------------------------------------
+def _get_slices_along_direction(
+    labeled_img: np.ndarray,
+    slicing_dir: Iterable[float],
+    centroid: Iterable[float],
+    height: float,    
+    slice_size: Optional[int] = 200,
+    num_slices: Optional[int] = 10,
+) -> Tuple[List[np.ndarray[int]], Tuple[List[List[float]], List[float]]]:
+    
+    # Define the centers of the sampling grids
+    slicing_dir = np.asarray(slicing_dir)
+    slicing_centers = np.asarray([
+        slicing_dir * i 
+        for i in np.linspace(-height, height, num_slices)
+    ]) + centroid
+
+    # Compute the rotation matrix
+    # Get a normal vector with Gramm-Schmidt method
+    random_vector = np.random.rand(3)
+    normal_vector = random_vector - np.dot(random_vector, slicing_dir) * slicing_dir
+    normal_unit_vector = normal_vector / np.linalg.norm(normal_vector)
+    # Get third vector to form orthonormal basis
+    third_vector = np.cross(slicing_dir, normal_unit_vector)
+    # Arrange vectors in rotation matrix
+    rot_matrix = np.column_stack(
+        (normal_unit_vector, third_vector, slicing_dir)
+    )
+    rotations = [Rotation.from_matrix(rot_matrix)]
+
+    # Save specifiers of the different grids
+    grid_specs = (
+        [list(center) for center in slicing_centers], 
+        list(slicing_dir)
+    )
+
+    labeled_slices = []
+    for center in slicing_centers:
+        # Generate a grid with the requested size
+        grid_center_point = center
+        grid_shape = [slice_size + 1] * 2
+        grid = generate_2d_grid(grid_shape)
+
+        # Rotate and translate the grid
+        sampling_coordinates = place_sampling_grids(
+            grid, grid_center_point, rotations
+        )
+
+        # Sample values from the grid
+        sampled_plane = sample_volume_at_coordinates(
+            labeled_img,
+            sampling_coordinates,
+            interpolation_order=0,
+        )
+
+        labeled_slices.append(sampled_plane)
+
+    return labeled_slices, grid_specs
+#------------------------------------------------------------------------------------------------------------
+
+
+
+#------------------------------------------------------------------------------------------------------------
+def _compute_2D_area_along_direction(
+		labeled_slice: np.ndarray[int], 
+		cell_label: np.ndarray[int],
+		pixel_size: Iterable[float]
+) -> float:
+	
+	binary_slice = (labeled_slice == cell_label).astype(np.uint16)
+	if np.any(binary_slice):
+		pixel_count = np.sum(binary_slice)
+		pixel_area = pixel_size[0] * pixel_size[1]
+		area = pixel_count * pixel_area
+		return area
+	else:
+		return 0.0
+#------------------------------------------------------------------------------------------------------------
+
+
+
+#------------------------------------------------------------------------------------------------------------
+def _compute_2D_neighbors_along_direction(
+        labeled_slice: np.ndarray[int], 
+        cell_label: np.ndarray[int],
+        background_threshold: float = 0.1
+) -> List[int]:
+
+	#Get the pixels of the cell
+	binary_slice = labeled_slice == cell_label
+
+	# Check if cell is present in the slice
+	if not np.any(binary_slice):
+		return [-1]
+
+	#Expand the volume of the cell by 2 voxels in each direction
+	expanded_cell_voxels = ndimage.binary_dilation(binary_slice, iterations=2)
+		
+	#Find the voxels that are directly in contact with the surface of the cell
+	cell_surface_voxels = expanded_cell_voxels ^ binary_slice
+
+	#Get the labels of the neighbors
+	neighbors, counts = np.unique(labeled_slice[cell_surface_voxels], return_counts=True)
+
+	#Check if the label is touching the background above a certain threshold
+	# print(f'Cell {cell_label}: {neighbors}, {counts}')
+	if (0 in neighbors) and (counts[0] > np.sum(counts[:1]) * background_threshold):
+		return [-1]
+	else:
+		#Remove the label of the cell itself, and the label of the background from the neighbors list
+		neighbors = neighbors[(neighbors != cell_label) & (neighbors != 0)]
+		return list(neighbors)
+#------------------------------------------------------------------------------------------------------------
+
+
+
+#------------------------------------------------------------------------------------------------------------
+def compute_2D_statistics_along_axis(
+        labeled_img: np.ndarray[int],
+        cell_mesh_dict: Dict[int, tm.base.Trimesh],
+        exclude_labels: Iterable[int],
+        voxel_size: Iterable[float],
+        number_slices: int = 10, 
+        slice_ext: int = 200,
+        remove_empty: Optional[bool] = True
+) -> Tuple[Dict[int, List[List[int]]], Dict[int, List[int]], Dict[int, List[float]], Dict[int, Tuple[List[List[float]], List[float]]]]:
+    
+    if np.any(slice_ext > np.asarray(labeled_img.shape)):
+        slice_ext = np.min(labeled_img.shape)
+
+    # Iterate over the cells
+    label_ids = np.unique(labeled_img)
+
+    neighbors_dict = {}
+    areas_dict = {}
+    slices_dict = {}
+    for i, label_id in tqdm(enumerate(label_ids[1:]), desc='Computing cell 2D statistics along apical-basal axis', total=(len(label_ids)-1)):
+        if label_id in exclude_labels:
+            neighbors_dict[label_id] = [[]]
+            areas_dict[label_id] = []
+            slices_dict[label_id] = ()
+        else:
+            # Compute principal axis, axis length and centroid coordinates 
+            cell_mesh = cell_mesh_dict[i]
+            eigen_values, eigen_vectors = tm.inertia.principal_axis(cell_mesh.moment_inertia)
+            smallest_eigen_value_idx = np.argmin(np.abs(eigen_values))
+            principal_axis = eigen_vectors[smallest_eigen_value_idx]
+            principal_axis = np.asarray(principal_axis) * np.asarray(voxel_size)
+            principal_axis = principal_axis / np.linalg.norm(principal_axis)
+
+            binary_img = (labeled_img == label_id).astype(np.uint8)
+            props = regionprops(binary_img)[0]
+            cell_centroid = props.centroid
+            cell_length = int(props.axis_major_length)
+
+            # Get slices along principal axis direction
+            labeled_slices, slices_specs = _get_slices_along_direction(
+                labeled_img=labeled_img,
+                slicing_dir=principal_axis,
+                centroid=cell_centroid,
+                height=cell_length,
+                slice_size=slice_ext,
+                num_slices=number_slices
+            )
+
+            # Iterate across slices to compute the statistics
+            cell_areas = []
+            cell_neighbors = []
+            for labeled_slice in labeled_slices:
+                area_slice = _compute_2D_area_along_direction(
+                    labeled_slice=labeled_slice,
+                    cell_label=label_id,
+                    pixel_size=voxel_size[:2]
+                )
+                cell_areas.append(area_slice)
+                neighbors_slice = _compute_2D_neighbors_along_direction(
+                    labeled_slice=labeled_slice,
+                    cell_label=label_id
+                )
+                cell_neighbors.append(neighbors_slice)
+            
+            if remove_empty:
+                # Post-process results to remove empty values
+                to_remove = [neighs == [-1] for neighs in cell_neighbors]
+                cell_neighbors = [neighs for neighs, flag in zip(cell_neighbors, to_remove) if not flag]
+                cell_areas = [area for area, flag in zip(cell_areas, to_remove) if not flag]
+                new_slices_specs = [item for item, flag in zip(slices_specs[0], to_remove) if not flag]
+                slices_specs = (new_slices_specs, slices_specs[1])
+
+            neighbors_dict[label_id] = cell_neighbors
+            areas_dict[label_id] = cell_areas
+            slices_dict[label_id] = slices_specs
+
+    return neighbors_dict, areas_dict, slices_dict
 #------------------------------------------------------------------------------------------------------------

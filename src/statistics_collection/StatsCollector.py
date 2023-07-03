@@ -49,7 +49,11 @@ class StatsCollector:
     stats_collector = StatsCollector(
         meshes=meshes,
         labels=preprocessed_labeled_img,
-        features=['area', 'volume', 'elongation_and_axes', 'neighbors', 'contact_area', '2D_statistics],
+        features=[
+            'area', 'volume', 'elongation_and_axes', 
+            'neighbors', 'contact_area', '2D_statistics', '
+            2D_statistics_principal_axis'
+        ],
         output_directory='/output',
         path_to_img='/output/processed_labels.tif',
         tissue='lung_bronchiole',
@@ -64,12 +68,12 @@ class StatsCollector:
             self,
             meshes: Dict[int, tm.base.Trimesh],
             labels: np.ndarray[int],
-            # original_ids: List[int],
             features: List[str],
             output_directory: str,
             path_to_img: str,
             tissue: str,
             voxel_size: Iterable[float],
+            num_2D_slices: int,
             num_workers: int
         ) -> None:
 
@@ -82,7 +86,6 @@ class StatsCollector:
         self.meshes = meshes
         self.labels = labels
         self.ids = list(self.meshes.keys())
-        # self.original_ids = original_ids
         self.features = features 
         self.functions = [
             self._features_to_functions[feature] 
@@ -91,6 +94,7 @@ class StatsCollector:
         self.tissue = tissue
         self.tissue_type = self._tissues_to_types[tissue]
         self.voxel_size = voxel_size
+        self.num_2D_slices = num_2D_slices
         self.slicing_dim = self._tissues_to_slicing_dims[tissue]
         self.output_dir = output_directory
         self.df_output_dir = os.path.join(self.output_dir, 'cell_stats')
@@ -113,15 +117,19 @@ class StatsCollector:
 
     @staticmethod
     def _feat_to_func_dict() -> Dict[str, Callable]:
-        features = ['area', 'volume', 'elongation_and_axes',
-                    'neighbors', 'contact_area', '2D_statistics']
+        features = [
+            'area', 'volume', 'elongation_and_axes', 
+            'neighbors', 'contact_area', '2D_statistics',
+            '2D_statistics_principal_axis'
+        ],
         functions = [
             compute_cell_surface_areas,
             compute_cell_volumes,
             compute_cell_principal_axis_and_elongation,
             compute_cell_neighbors,
             compute_cell_contact_area,
-            compute_2D_statistics
+            compute_2D_statistics,
+            compute_2D_statistics_along_axis
         ]
 
         return dict(zip(features, functions))
@@ -247,6 +255,13 @@ class StatsCollector:
                 feature_data = StatsCollector._unpack_feature_dict(feature_dict[i])
                 #add column to df
                 self.df[feat_names[i]] = feature_data 
+        elif feature_name == '2D_statistics_principal_axis':
+            for i in range(3):
+                feat_names = ['neighbors_2D_principal', 'area_2D_principal', 'slices_principal']
+                #unpack the dictionary
+                feature_data = StatsCollector._unpack_feature_dict(feature_dict[i])
+                #add column to df
+                self.df[feat_names[i]] = feature_data 
         else:
             #unpack the dictionary
             feature_data = StatsCollector._unpack_feature_dict(feature_dict)
@@ -314,6 +329,16 @@ class StatsCollector:
                 np.concatenate((self.voxel_size[:self.slicing_dim], 
                                 self.voxel_size[(self.slicing_dim+1):]))
             )
+        elif feature_name == '2D_statistics_principal_axis':
+            args = (
+                self.labels,
+                self.meshes,
+                self.excluded_idxs,
+                self.voxel_size,
+                self.num_2D_slices,
+                200,
+                True
+            )
         else:
             args = (
                 self.meshes,
@@ -352,6 +377,9 @@ class StatsCollector:
         #compute number of neighbors in 2D slices
         if '2D_statistics' in self.features:
             self.df["num_neighbors_2D"] = self.df['neighbors_2D'].apply(lambda x: [len(l) for l in x])
+
+        if '2D_statistics_principal_axis' in self.features:
+            self.df["num_neighbors_2D_principal"] = self.df['neighbors_2D_principal'].apply(lambda x: [len(l) for l in x])
 
 
     def collect_statistics(
