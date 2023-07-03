@@ -150,19 +150,6 @@ class StatsCollector:
     
     
     def filter_cells(self) -> List[int]:
-        # if 'simple' in self.tissue_type:
-        #     idxs_to_filter = get_labels_touching_edges(
-        #         self.labels, self.output_dir
-        #     )
-        # elif 'stratified' in self.tissue_type:
-            # idxs_edges = get_labels_touching_edges(
-            #     self.labels, self.output_dir
-            # )
-            # idxs_bg = get_labels_touching_background(
-            #     self.labels, self.output_dir
-            # )
-        #     idxs_to_filter = np.union1d(idxs_edges, idxs_bg)
-
         if self.tissue == 'embryo':
             idxs_to_filter = []
         elif self.tissue == 'lung':
@@ -170,13 +157,13 @@ class StatsCollector:
                 self.labels, 
                 self.output_dir
             )
-            idxs_bg = get_labels_touching_background(
+            idxs_bg, _ = get_labels_touching_background(
                 self.labels, 
                 self.slicing_dim,
                 self.output_dir,
                 0.1
             )
-            idxs_to_filter = np.union1d(idxs_edges, idxs_bg)
+            idxs_to_filter = np.logical_or(idxs_edges, idxs_bg)
         else:
             idxs_to_filter = get_labels_touching_edges(
                 self.labels, self.output_dir
