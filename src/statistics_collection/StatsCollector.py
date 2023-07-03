@@ -136,15 +136,15 @@ class StatsCollector:
 
     @staticmethod
     def _tissue_to_type_dict() -> Dict[str, str]:
-        tissues = ['bladder', 'intestine_villus', 'lung_bronchiole', 'esophagus', 'embryo']
-        tissue_types = ['stratified_transitional', 'simple_columnar', 'simple_cuboidal', 'stratified_squamous', 'Undefined']
+        tissues = ['bladder', 'intestine_villus', 'lung_bronchiole', 'esophagus', 'embryo', 'lung']
+        tissue_types = ['stratified_transitional', 'simple_columnar', 'simple_cuboidal', 'stratified_squamous', 'Undefined', 'pseudostratified']
 
         return dict(zip(tissues, tissue_types))
     
     @staticmethod
     def _tissue_to_slicing_dim_dict() -> Dict[str, int]:
-        tissues = ['bladder', 'intestine_villus', 'lung_bronchiole', 'esophagus', 'embryo']
-        slicing_dims = [1, 0, 2, 1, 0]
+        tissues = ['bladder', 'intestine_villus', 'lung_bronchiole', 'esophagus', 'embryo', 'lung']
+        slicing_dims = [1, 0, 2, 1, 0, 2]
 
         return dict(zip(tissues, slicing_dims))
     
