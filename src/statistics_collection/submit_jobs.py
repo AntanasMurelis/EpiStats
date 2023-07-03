@@ -39,7 +39,9 @@ def create_slurm(
 #SBATCH -n 1
 #SBATCH --cpus-per-task={max_workers}
 #SBATCH --time=12:00:00
-#SBATCH --mem-per-cpu=10240
+#SBATCH --mem-per-cpu=16384
+#SBATCH --output="./slurm_files"
+#SBATCH --open-mode=append
 
 python src/run.py --config {config_file}   
     """
