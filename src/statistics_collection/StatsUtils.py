@@ -596,14 +596,14 @@ def compute_2D_statistics_along_axis(
     neighbors_dict = {}
     areas_dict = {}
     slices_dict = {}
-    for i, label_id in tqdm(enumerate(label_ids[1:]), desc='Computing cell 2D statistics along apical-basal axis', total=(len(label_ids)-1)):
+    for label_id in tqdm(label_ids[1:], desc='Computing cell 2D statistics along apical-basal axis'):
         if label_id in exclude_labels:
             neighbors_dict[label_id] = [[]]
             areas_dict[label_id] = []
             slices_dict[label_id] = ()
         else:
             # Compute principal axis, axis length and centroid coordinates 
-            cell_mesh = cell_mesh_dict[i]
+            cell_mesh = cell_mesh_dict[label_id]
             eigen_values, eigen_vectors = tm.inertia.principal_axis(cell_mesh.moment_inertia)
             smallest_eigen_value_idx = np.argmin(np.abs(eigen_values))
             principal_axis = eigen_vectors[smallest_eigen_value_idx]
