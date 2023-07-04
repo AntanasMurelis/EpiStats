@@ -9,7 +9,7 @@
     "num_2D_slices": 50,
     "mesh_format": "stl",
     "max_workers": 8,
-    "features": ["area", "volume", "elongation_and_axes", "neighbors", "contact_area"],
+    "features": ["area", "volume", "elongation_and_axes", "neighbors", "contact_area", "2D_statistics", "2D_statistics_principal_axis"],
     "load_from_cache": false
 }
 
