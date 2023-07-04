@@ -598,7 +598,7 @@ def compute_2D_statistics_along_axis(
     slices_dict = {}
     for label_id in tqdm(label_ids[1:], desc='Computing cell 2D statistics along apical-basal axis'):
         if label_id in exclude_labels:
-            neighbors_dict[label_id] = [[]]
+            neighbors_dict[label_id] = []
             areas_dict[label_id] = []
             slices_dict[label_id] = ()
         else:

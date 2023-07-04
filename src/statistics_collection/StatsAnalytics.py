@@ -104,7 +104,9 @@ def prepare_df(
     # Features saved as lists are loaded as 'str'. Convert them back to 'list' type
     list_columns = [
         'neighbors', 'neighbors_2D', 'area_2D', 
-        'contact_area_distribution', 'num_neighbors_2D', 'slices'
+        'contact_area_distribution', 'num_neighbors_2D', 'slices',
+        'neighbors_2D_principal', 'area_2D_principal', 'slices_principal',
+        'num_neighbors_2D_principal'
     ]
     for column in list_columns:
         merged_df[column] = merged_df[column].apply(lambda x: re.sub(r'(\d)\s', r'\1,', x))
@@ -559,7 +561,7 @@ def _get_lewis_law_2D_stats(
             if row['exclude_cell']:
                 continue
             else:
-                assert len(row[col_num_neighbors]) == len(col_area), 'Bug in the 2D stats code!'
+                assert len(row[col_num_neighbors]) == len(row[col_area]), 'Bug in the 2D stats code!'
                 for area, num_neigh in zip(row[col_area], row[col_num_neighbors]):
                     if num_neigh < num_neighbors_lower_threshold:
                         continue
