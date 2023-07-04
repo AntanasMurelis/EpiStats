@@ -56,6 +56,7 @@ def main(config_path):
         tissue=args.tissue,
         voxel_size=args.voxel_size,
         num_2D_slices=args.num_2D_slices,
+        size_2D_slices=args.size_2D_slices,
         num_workers=args.max_workers
     )
 
