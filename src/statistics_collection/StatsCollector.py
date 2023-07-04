@@ -74,6 +74,7 @@ class StatsCollector:
             tissue: str,
             voxel_size: Iterable[float],
             num_2D_slices: int,
+            size_2D_slices: int,
             num_workers: int
         ) -> None:
 
@@ -105,6 +106,7 @@ class StatsCollector:
         self.ids = list(self.meshes.keys())
         self.voxel_size = voxel_size
         self.num_2D_slices = num_2D_slices
+        self.size_2D_slices = size_2D_slices
         self.slicing_dim = self._tissues_to_slicing_dims[tissue]
         self.output_dir = output_directory
         self.df_output_dir = os.path.join(self.output_dir, 'cell_stats')
@@ -299,8 +301,7 @@ class StatsCollector:
                 self.excluded_idxs,
                 self.voxel_size,
                 self.num_2D_slices,
-                200,
-                True
+                self.size_2D_slices
             )
         else:
             args = (

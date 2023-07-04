@@ -7,6 +7,7 @@
     "smoothing_iters": 10,
     "voxel_size": [0.21, 0.21, 0.39],
     "num_2D_slices": 50,
+    "size_2D_slices": 200,
     "mesh_format": "stl",
     "max_workers": 8,
     "features": ["area", "volume", "elongation_and_axes", "neighbors", "contact_area", "2D_statistics", "2D_statistics_principal_axis"],
