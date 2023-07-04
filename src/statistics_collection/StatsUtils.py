@@ -585,7 +585,7 @@ def compute_2D_statistics_along_axis(
         number_slices: int = 10, 
         slice_ext: int = 200,
         remove_empty: Optional[bool] = True
-) -> Tuple[Dict[int, List[List[int]]], Dict[int, List[int]], Dict[int, List[float]], Dict[int, Tuple[List[List[float]], List[float]]]]:
+) -> Tuple[Dict[int, List[List[int]]], Dict[int, List[float]], Dict[int, Tuple[List[List[float]], List[float]]]]:
     
     if np.any(slice_ext > np.asarray(labeled_img.shape)):
         slice_ext = np.min(labeled_img.shape)
