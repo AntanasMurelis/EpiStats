@@ -123,41 +123,7 @@ class StatsCollector:
         #initialize and save the dataframe to store statistics
         self.df = self._init_dataframe()
         #save the newly created data structure
-        self._save_dataframe()
-
-    @staticmethod
-    def _feat_to_func_dict() -> Dict[str, Callable]:
-        features = [
-            'area', 'volume', 'elongation_and_axes', 
-            'neighbors', 'contact_area', '2D_statistics',
-            '2D_statistics_principal_axis'
-        ],
-        functions = [
-            compute_cell_surface_areas,
-            compute_cell_volumes,
-            compute_cell_principal_axis_and_elongation,
-            compute_cell_neighbors,
-            compute_cell_contact_area,
-            compute_2D_statistics,
-            compute_2D_statistics_along_axis
-        ]
-
-        return dict(zip(features, functions))
-
-    @staticmethod
-    def _tissue_to_type_dict() -> Dict[str, str]:
-        tissues = ['bladder', 'intestine_villus', 'lung_bronchiole', 'esophagus', 'embryo', 'lung']
-        tissue_types = ['stratified_transitional', 'simple_columnar', 'simple_cuboidal', 'stratified_squamous', 'Undefined', 'pseudostratified']
-
-        return dict(zip(tissues, tissue_types))
-    
-    @staticmethod
-    def _tissue_to_slicing_dim_dict() -> Dict[str, int]:
-        tissues = ['bladder', 'intestine_villus', 'lung_bronchiole', 'esophagus', 'embryo', 'lung']
-        slicing_dims = [1, 0, 2, 1, 0, 2]
-
-        return dict(zip(tissues, slicing_dims))
-    
+        self._save_dataframe()    
     
     def filter_cells(self) -> List[int]:
         if self.tissue == 'embryo':
