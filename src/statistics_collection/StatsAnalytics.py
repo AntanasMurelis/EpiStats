@@ -515,6 +515,7 @@ def apply_PCA(
 def _get_lewis_law_2D_stats(
     df: pd.DataFrame,
     num_neighbors_lower_threshold: Optional[int] = 3,
+    principal_axis: Optional[bool] = True
 ) -> Dict[str, Dict[int, Tuple[float, float]]]:
     '''
     Compute the statistics needed for checking 2D Lewis' Law.
@@ -526,6 +527,10 @@ def _get_lewis_law_2D_stats(
         
         num_neighbors_lower_threshold: (Optional[int], default=3)
             The threshold under which a cell is excluded from computation.
+        
+        principal_axis (Optional[bool], default=True)
+            If True compute the lewis law statistics for the 2D statistics 
+            collected along cells' principal_axes.
 
     Returns:
     --------
@@ -535,6 +540,13 @@ def _get_lewis_law_2D_stats(
             Each inner dictionary then has number of neighbors values as keys and tuples 
             of normalized averages and standard errors as values.
     '''
+
+    if principal_axis:
+        col_num_neighbors = 'num_neighbors_2D_principal'
+        col_area = 'area_2D_principal'
+    else:
+        col_num_neighbors = 'num_neighbors_2D'
+        col_area = 'area_2D'
 
     tissues = df['tissue'].unique()
 
@@ -547,8 +559,8 @@ def _get_lewis_law_2D_stats(
             if row['exclude_cell']:
                 continue
             else:
-                assert len(row['neighbors_2D']) == len(row['area_2D']), 'Bug in the 2D stats code!'
-                for area, num_neigh in zip(row['area_2D'], row['num_neighbors_2D']):
+                assert len(row[col_num_neighbors]) == len(col_area), 'Bug in the 2D stats code!'
+                for area, num_neigh in zip(row[col_area], row[col_num_neighbors]):
                     if num_neigh < num_neighbors_lower_threshold:
                         continue
                     else:

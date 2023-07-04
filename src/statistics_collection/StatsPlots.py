@@ -715,6 +715,7 @@ def lewis_law_plots(
 def lewis_law_2D_plots(
     df: pd.DataFrame, 
     fit_degrees: Optional[Iterable[int]] = [1,2],
+    version: Literal['standard', 'principal'] = 'standard',
     remove_outliers: Optional[bool] = True,
     color_map: Optional[Union[ListedColormap, str]] = 'viridis',
     save_dir: Optional[str] = None,     
@@ -730,6 +731,11 @@ def lewis_law_2D_plots(
         
         fit_degrees: (Optional[Iterable[int]], default=[1,2])
             The degree of the polynomial fitted on the data in the plots.
+
+        version: (Literal['standard', 'principal'], default='standard')
+            If 'standard', 2D statistics collected along coordinate axis
+            are considered. If 'principal', 2D stats collected along cells'
+            principal axes are considered instead.
 
         remove_outliers: (Optional[bool], default=True)
             If true, outliers are removed from the dataframe.
@@ -755,7 +761,9 @@ def lewis_law_2D_plots(
     elif isinstance(color_map, ListedColormap):
         colors = color_map.colors
 
-    lewis_law_stats = _get_lewis_law_2D_stats(df)
+    lewis_law_stats = _get_lewis_law_2D_stats(
+        df, principal_axis=(version=='principal')
+    )
 
     min_x, max_x = 2, 16
     max_y = 4.0
@@ -764,7 +772,7 @@ def lewis_law_2D_plots(
         figsize=(len(tissues)*6, 12),
         constrained_layout=True
     )
-    fig.suptitle(f"Lewis' Law for 2D cell area", fontsize=36)
+    fig.suptitle(f"Lewis' Law for 2D cell area collected along {version} axes", fontsize=36)
     subplot_id = 1
     for i, tissue in enumerate(tissues):
         # Get the current axis object
@@ -1081,5 +1089,4 @@ def violin_plots(
         plt.show()
     else:
         plt.close()
-#------------------------------------------------------------------------------------------------------------
 #------------------------------------------------------------------------------------------------------------
