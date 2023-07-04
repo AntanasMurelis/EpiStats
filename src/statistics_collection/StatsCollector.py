@@ -97,7 +97,7 @@ class StatsCollector:
             'stratified_squamous', 'Undefined', 'pseudostratified'
         ]
         self._tissues_to_types = dict(zip(self._avail_tissues, self._avail_tissue_types))
-        self._avail_slicing_dims = [1, 0, 2, 1, 0, 2]
+        self._avail_slicing_dims = [0, 2, 1, 0, 2, 1]
         self._tissues_to_slicing_dims = dict(zip(self._avail_tissues, self._avail_slicing_dims))
         self.tissue = tissue
         self.tissue_type = self._tissues_to_types[tissue]
