@@ -904,8 +904,6 @@ if __name__ == "__main__":
     main()
 
 
-
-if __name__ == "__main__":
     
     """
     Please ensure that the path to label is preprocessed (perform erosion/dilation/removal of detached regions etc...)
