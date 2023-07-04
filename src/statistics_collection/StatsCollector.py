@@ -173,7 +173,7 @@ class StatsCollector:
                 self.output_dir,
                 0.1
             )
-            idxs_to_filter = np.logical_or(idxs_edges, idxs_bg)
+            idxs_to_filter = np.union1d(idxs_edges, idxs_bg)
         else:
             idxs_to_filter = get_labels_touching_edges(
                 self.labels, self.output_dir
