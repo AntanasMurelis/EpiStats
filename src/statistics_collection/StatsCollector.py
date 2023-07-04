@@ -134,8 +134,9 @@ class StatsCollector:
             idxs_to_filter, _ = get_labels_touching_background(
                 self.labels, 
                 self.slicing_dim,
+                [150, 360],
+                0.1,
                 self.output_dir,
-                0.1
             )
         else:
             idxs_to_filter = get_labels_touching_edges(
