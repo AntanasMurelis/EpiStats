@@ -55,6 +55,7 @@ def main(config_path):
         path_to_img=os.path.join(output_dir, 'processed_labels.tif'),
         tissue=args.tissue,
         voxel_size=args.voxel_size,
+        num_2D_slices=args.num_2D_slices,
         num_workers=args.max_workers
     )
 

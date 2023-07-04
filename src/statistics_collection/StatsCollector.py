@@ -77,22 +77,32 @@ class StatsCollector:
             num_workers: int
         ) -> None:
 
-        #internal attributespath_to_img
-        self._features_to_functions = StatsCollector._feat_to_func_dict()
-        self._tissues_to_types = StatsCollector._tissue_to_type_dict()
-        self._tissues_to_slicing_dims = StatsCollector._tissue_to_slicing_dim_dict()
-        
-        #public attributes
+        self.features = features 
+        self.functions = [
+            compute_cell_surface_areas,
+            compute_cell_volumes,
+            compute_cell_principal_axis_and_elongation,
+            compute_cell_neighbors,
+            compute_cell_contact_area,
+            compute_2D_statistics,
+            compute_2D_statistics_along_axis
+        ]
+        self._features_to_functions = dict(zip(self.features, self.functions))
+        self._avail_tissues = [
+            'bladder', 'intestine_villus', 'lung_bronchiole', 'esophagus', 'embryo', 'lung'
+        ]
+        self._avail_tissue_types = [
+            'stratified_transitional', 'simple_columnar', 'simple_cuboidal', 
+            'stratified_squamous', 'Undefined', 'pseudostratified'
+        ]
+        self._tissues_to_types = dict(zip(self._avail_tissues, self._avail_tissue_types))
+        self._avail_slicing_dims = [1, 0, 2, 1, 0, 2]
+        self._tissues_to_slicing_dims = dict(zip(self._avail_tissues, self._avail_slicing_dims))
+        self.tissue = tissue
+        self.tissue_type = self._tissues_to_types[tissue]
         self.meshes = meshes
         self.labels = labels
         self.ids = list(self.meshes.keys())
-        self.features = features 
-        self.functions = [
-            self._features_to_functions[feature] 
-            for feature in self.features
-        ]
-        self.tissue = tissue
-        self.tissue_type = self._tissues_to_types[tissue]
         self.voxel_size = voxel_size
         self.num_2D_slices = num_2D_slices
         self.slicing_dim = self._tissues_to_slicing_dims[tissue]
