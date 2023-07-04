@@ -1,4 +1,4 @@
-from typing import List, Optional, Tuple, Dict
+from typing import List, Optional, Tuple, Dict, Iterable
 import numpy as np
 from tqdm import tqdm
 import os
@@ -69,8 +69,9 @@ def remove_unconnected_regions(
 def get_labels_touching_background(
         labeled_img: np.ndarray[int], 
         slicing_dim: int, 
+        crop_limits: Optional[Iterable[int]] = None,
+        threshold: Optional[float] = 0.5,
         output_directory: Optional[str] = None,
-        threshold: Optional[float] = 0.5
     ) -> Tuple[np.ndarray[int], Dict[int, int]]:
     """
     Remove all labels that touch the background (label 0) more than the specified threshold.
@@ -84,12 +85,16 @@ def get_labels_touching_background(
     slicing_dim: (int)
         The dimension along which slices are taken.
 
-    output_directory: (str, default=None)
+    crop_limits: (Optional[Iterable[int]], default=None)
+        The lower and upper indexes of slices of the crop that is considered to compute 
+        labels touching the background (useful for `pseudostratified` samples).
+    
+    threshold: (Optional[float], default=0.5)
+        The minimum relative number of background pixels a label must touch to be removed.
+
+    output_directory: (Optional[str], default=None)
         Name of the folder where the labels indexes will be saved.
         If None nothing will be saved.
-
-    threshold: (float, optional, default=0.5)
-        The minimum relative number of background pixels a label must touch to be removed.
 
     Returns:
     --------
@@ -112,10 +117,17 @@ def get_labels_touching_background(
 
     reordered_labeled_img = np.einsum(reordering_expr, labeled_img)
 
+    if not crop_limits:
+        crop_limits = (0, reordered_labeled_img.shape[0])
+
     labels_touching_background = set()
     background_touch_counts = {} 
 
-    for labeled_slice in tqdm(reordered_labeled_img, desc='Cheking cells touching background'):
+    for i, labeled_slice in tqdm(enumerate(reordered_labeled_img), 
+                                 desc='Cheking cells touching background',
+                                 total=reordered_labeled_img.shape[0]):
+        if (i < crop_limits[0]) or (i > crop_limits[1]):
+            continue
         # Find the unique labels in the labeled slice
         unique_labels = np.unique(labeled_slice)
 
