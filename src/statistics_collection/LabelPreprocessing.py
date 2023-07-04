@@ -115,7 +115,7 @@ def get_labels_touching_background(
     labels_touching_background = set()
     background_touch_counts = {} 
 
-    for labeled_slice in tqdm(reordered_labeled_img):
+    for labeled_slice in tqdm(reordered_labeled_img, desc='Cheking cells touching background'):
         # Find the unique labels in the labeled slice
         unique_labels = np.unique(labeled_slice)
 
