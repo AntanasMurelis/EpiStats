@@ -731,6 +731,7 @@ def lewis_law_2D_plots(
         
         fit_degrees: (Optional[Iterable[int]], default=[1,2])
             The degree of the polynomial fitted on the data in the plots.
+            If `None`, no polynomial fitting is done.
 
         version: (Literal['standard', 'principal'], default='standard')
             If 'standard', 2D statistics collected along coordinate axis
@@ -786,38 +787,40 @@ def lewis_law_2D_plots(
         x = np.asarray(list(data.keys()), dtype=np.int64)
         y_val = list([val[0] for val in data.values()])
         y_err = list([val[1] for val in data.values()])
-        fits = [np.polyfit(x, y_val, degree, cov=True) for degree in fit_degrees]
-        coeff_sets = [fit[0] for fit in fits]
-        std_err_sets = [np.sqrt(np.diag(fit[1])) for fit in fits] 
-        confint_width_sets = [
-            [
-                stats.t(df=len(x)-len(coeff_set)).ppf(0.975)*std_err
-                for coeff, std_err in zip(coeff_set, std_errs)
-            ]
-            for coeff_set, std_errs in zip(coeff_sets, std_err_sets)
-        ]
-        polylines = [np.poly1d(coeff_set) for coeff_set in coeff_sets] 
         x_fit = np.arange(min_x, max_x, dtype=np.int32) 
-        y_linear, y_quadratic = (polyline(x_fit) for polyline in polylines)
+        if fit_degrees:
+            fits = [np.polyfit(x, y_val, degree, cov=True) for degree in fit_degrees]
+            coeff_sets = [fit[0] for fit in fits]
+            std_err_sets = [np.sqrt(np.diag(fit[1])) for fit in fits] 
+            confint_width_sets = [
+                [
+                    stats.t(df=len(x)-len(coeff_set)).ppf(0.975)*std_err
+                    for coeff, std_err in zip(coeff_set, std_errs)
+                ]
+                for coeff_set, std_errs in zip(coeff_sets, std_err_sets)
+            ]
+            polylines = [np.poly1d(coeff_set) for coeff_set in coeff_sets] 
+            y_linear, y_quadratic = (polyline(x_fit) for polyline in polylines)
         y_th_linear = (x_fit - 2) / 4
         y_th_quadratic = (x_fit / 6)**2
 
         # Plot the values and the fitted lines
         ax.errorbar(x, y_val, yerr=y_err, fmt='o', color=colors[i], ecolor='grey', capsize=8, markersize=10)
-        coeffs = [round(coeff, 2) for coeff in coeff_sets[0]]
-        ci_widths = [round(ci_width, 2) for ci_width in confint_width_sets[0]]
-        linear, = ax.plot(
-            x_fit, y_linear, 
-            color='red', linestyle='--', 
-            label=f'Linear fit, coeff: a={coeffs[1]}\u00B1{ci_widths[1]}, b={coeffs[0]}\u00B1{ci_widths[0]}'
-        )
-        coeffs = [round(coeff, 2) for coeff in coeff_sets[1]]  
-        ci_widths = [round(ci_width, 2) for ci_width in confint_width_sets[1]]
-        quadratic, = ax.plot(
-            x_fit, y_quadratic, 
-            color='green', linestyle='-.', 
-            label=f'Quadratic fit, coeff: a={coeffs[2]}\u00B1{ci_widths[2]}, b={coeffs[1]}\u00B1{ci_widths[1]}, c={coeffs[0]}\u00B1{ci_widths[0]}'
-        )
+        if fit_degrees:
+            coeffs = [round(coeff, 2) for coeff in coeff_sets[0]]
+            ci_widths = [round(ci_width, 2) for ci_width in confint_width_sets[0]]
+            linear, = ax.plot(
+                x_fit, y_linear, 
+                color='red', linestyle='--', 
+                label=f'Linear fit, coeff: a={coeffs[1]}\u00B1{ci_widths[1]}, b={coeffs[0]}\u00B1{ci_widths[0]}'
+            )
+            coeffs = [round(coeff, 2) for coeff in coeff_sets[1]]  
+            ci_widths = [round(ci_width, 2) for ci_width in confint_width_sets[1]]
+            quadratic, = ax.plot(
+                x_fit, y_quadratic, 
+                color='green', linestyle='-.', 
+                label=f'Quadratic fit, coeff: a={coeffs[2]}\u00B1{ci_widths[2]}, b={coeffs[1]}\u00B1{ci_widths[1]}, c={coeffs[0]}\u00B1{ci_widths[0]}'
+            )
         th_linear, = ax.plot(
             x_fit, y_th_linear,
             color='orange', linestyle='--',
@@ -834,24 +837,43 @@ def lewis_law_2D_plots(
         ax.set_xlabel(r'Number of neighbors $(n)$', fontsize=24)
         ax.set_ylabel(r'$\bar{A}_n / \bar{A}$', fontsize=24)
         ax.set_xticks(x_fit)
-        ax.legend(
-            handles=[linear, th_linear, quadratic, th_quadratic], 
-            loc='upper left', 
-            fontsize=16
-        )
-        ax.text(
-            x=11, 
-            y=0.25, 
-            s=(
-                r'Fitted line: $y=a+bx+c{x}^2$'
-                '\n'
-                r'Theoretical linear fit: $\bar{A}_n / \bar{A} = \frac{(n-2)}{4}$'
-                '\n'
-                r'Theoretical quadratic fit: $\bar{A}_n / \bar{A} \sim\ (\frac{n}{6})^2$'
-            ), 
-            style='italic', 
-            fontsize=12
-        )
+        if fit_degrees:
+            ax.legend(
+                handles=[linear, th_linear, quadratic, th_quadratic], 
+                loc='upper left', 
+                fontsize=16
+            )
+            ax.text(
+                x=11, 
+                y=0.25, 
+                s=(
+                    r'Fitted line: $y=a+bx+c{x}^2$'
+                    '\n'
+                    r'Theoretical linear fit: $\bar{A}_n / \bar{A} = \frac{(n-2)}{4}$'
+                    '\n'
+                    r'Theoretical quadratic fit: $\bar{A}_n / \bar{A} \sim\ (\frac{n}{6})^2$'
+                ), 
+                style='italic', 
+                fontsize=12
+            )
+        else:
+            ax.legend(
+                handles=[th_linear, th_quadratic], 
+                loc='upper left', 
+                fontsize=16
+            )
+            ax.text(
+                x=11, 
+                y=0.25, 
+                s=(
+                    r'Theoretical linear fit: $\bar{A}_n / \bar{A} = \frac{(n-2)}{4}$'
+                    '\n'
+                    r'Theoretical quadratic fit: $\bar{A}_n / \bar{A} \sim\ (\frac{n}{6})^2$'
+                ), 
+                style='italic', 
+                fontsize=12
+            )
+
 
         # Set axes limits
         # ax.set_xlim([min_x, max_x])
@@ -866,7 +888,7 @@ def lewis_law_2D_plots(
     if save_dir:
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
-        save_name = f"lewis_law_2D_plots.jpg"
+        save_name = f"lewis_law_2D_{version}_plots.jpg"
         plt.savefig(os.path.join(save_dir, save_name), bbox_inches='tight', dpi=150) 
 
     # Show the plot
