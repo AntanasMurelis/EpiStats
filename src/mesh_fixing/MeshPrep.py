@@ -87,7 +87,9 @@ def fill_holes_pymeshfix(mesh: trimesh.Trimesh):
  
  
 #---------------------------------------------------------------------------------------------------------------   
-def remove_non_manifold_faces_and_fill_holes(mesh: trimesh.Trimesh):
+def remove_non_manifold_faces_and_fill_holes(
+        mesh: trimesh.Trimesh
+    ) -> trimesh.Trimesh:
     """
     This function removes the non-manifold faces from a mesh and fills the holes.
 
@@ -119,7 +121,11 @@ def remove_non_manifold_faces_and_fill_holes(mesh: trimesh.Trimesh):
 
 
 #---------------------------------------------------------------------------------------------------------------
-def remesh(input_dir: str, output_dir: str, min_edge_length: float = 0.1):
+def remesh(
+        input_dir: str, 
+        output_dir: str, 
+        min_edge_length: float = 0.1
+    ) -> str:
     """
     This function remeshes .stl or .ply files in a directory.
     
@@ -136,7 +142,7 @@ def remesh(input_dir: str, output_dir: str, min_edge_length: float = 0.1):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    for filename in os.listdir(input_dir):
+    for filename in tqdm(os.listdir(input_dir), desc='Applying pymeshlab remeshing'):
         if filename.endswith('.stl') or filename.endswith('.ply'):
             input_file = os.path.join(input_dir, filename)
             ms = pymeshlab.MeshSet()
@@ -188,7 +194,10 @@ def remesh(input_dir: str, output_dir: str, min_edge_length: float = 0.1):
 
 
 #---------------------------------------------------------------------------------------------------------------   
-def clean_meshes_in_directory(input_directory: str, output_directory: str):
+def clean_meshes_in_directory(
+        input_directory: str, 
+        output_directory: str
+    ) -> str:
     """
     This function cleans .ply or .stl mesh files in a directory by removing non-manifold faces and filling holes.
     
@@ -204,7 +213,7 @@ def clean_meshes_in_directory(input_directory: str, output_directory: str):
     if not os.path.exists(output_directory):
         os.makedirs(output_directory)
         
-    for filename in os.listdir(input_directory):
+    for filename in tqdm(os.listdir(input_directory), desc='Cleaning non-mainfold meshes'):
         if filename.endswith(".ply") or filename.endswith(".stl"):
             mesh_path = os.path.join(input_directory, filename)
             mesh = trimesh.load_mesh(mesh_path)
@@ -384,7 +393,13 @@ def separate_cell_points_and_faces(polydata, face_cell_id, point_cell_id):
 
 
 #---------------------------------------------------------------------------------------------------------------
-def write_unstructured_grid(polydata, face_dic, point_dic, output_file_path):
+def write_unstructured_grid(
+        polydata, 
+        face_dic, 
+        point_dic, 
+        output_file_path, 
+        label_of_the_cell = None
+    ):
     """
     This method directly writes a file at the legacy unstructured grid vtk format. 
 
@@ -465,9 +480,43 @@ def write_unstructured_grid(polydata, face_dic, point_dic, output_file_path):
     f.write("\nCELL_TYPES {}\n".format(face_dic.__len__()))
     for cell_id in face_dic.keys():
         f.write("42\n")
+    
+    # Add CELL_DATA section with metadata, if a label is provided
+    if label_of_the_cell is not None:
+        f.write("CELL_DATA {}\n".format(face_dic.__len__()))  # Add this line
+        f.write("SCALARS cell_ids int\nLOOKUP_TABLE default\n")
+        for _ in range(len(face_dic)):
+            f.write("{}\n".format(label_of_the_cell))
+
+    f.close()
+
 #---------------------------------------------------------------------------------------------------------------
 
 
+
+#---------------------------------------------------------------------------------------------------------------
+def get_cell_id_from_path(path):
+    """
+    Extract the cell_id from a path of the form 'path/cell_{cell_id}.stl'.
+
+    Parameters:
+    -----------
+    path: str
+        The path string to extract the cell_id from.
+
+    Returns:
+    --------
+    cell_id: int
+        The extracted cell_id or None if the name doesn't contain numbers.
+    """
+    filename = path.split('/')[-1]  # Get the last part of the path, which is the filename
+    cell_id_str = filename.split('_')[-1]  # Get the last part of the filename after '_'
+    try:
+        cell_id = int(cell_id_str.split('.')[0])  # Remove the file extension and convert to int
+        return cell_id
+    except:
+        return None
+#---------------------------------------------------------------------------------------------------------------
 
 
 
@@ -488,7 +537,7 @@ def convert_to_vtk(input_dir: str, output_dir: str):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    for filename in os.listdir(input_dir):
+    for filename in tqdm(os.listdir(input_dir), desc='Converting files to .vtk'):
         if filename.endswith('.stl') or filename.endswith('.ply'):
             input_file = os.path.join(input_dir, filename)
             
@@ -504,8 +553,12 @@ def convert_to_vtk(input_dir: str, output_dir: str):
             # Prepare the output file path
             output_file = os.path.join(output_dir, os.path.splitext(os.path.basename(input_file))[0] + '.vtk')  # Change the extension to .vtk
 
-            # Write the vtkUnstructuredGrid to the output file
-            write_unstructured_grid(polydata, face_dic, point_dic, output_file)
+            #Get the cell id from the path
+            cell_id = get_cell_id_from_path(input_file)
+
+            #Get the cells unstructured grids
+            write_unstructured_grid(polydata, face_dic, point_dic, output_file, label_of_the_cell = cell_id)
+
             
     return output_dir
 
@@ -534,7 +587,7 @@ def merge_vtk_files(input_dir: str, scale_factor: float = 1e-6):
     cell_labels = {}
     index = 0
 
-    for filename in os.listdir(input_dir):
+    for filename in tqdm(os.listdir(input_dir), desc='Merging .vtk files'):
         if filename.endswith('.vtk'):
             input_file = os.path.join(input_dir, filename)
             
@@ -652,7 +705,7 @@ def convert_cell_labels_to_meshes(
     if not os.path.exists(meshes_folder):
         os.makedirs(meshes_folder)
 
-    for label_id in tqdm(label_ids, desc="Converting labels to meshes"):
+    for label_id in label_ids:
         if label_id == 0: continue
         
         # Initial mesh - Marching Cubes algorithm
@@ -676,10 +729,16 @@ def convert_cell_labels_to_meshes(
 #---------------------------------------------------------------------------------------------------------------
 from scipy.ndimage import binary_dilation, binary_closing
 
-def create_and_export_meshes(cell_labels: list, image_path: str, output_dir:str,
-                             voxel_resolution: np.ndarray, make_shell: bool = True, 
-                             smoothing_iterations: int = 10,
-                             dilation_iter: int = 3, closing_iter: int = 2):
+def create_and_export_meshes(
+        cell_labels: list, 
+        image_path: str, 
+        output_dir: str,
+        voxel_resolution: np.ndarray, 
+        make_shell: bool = True, 
+        smoothing_iterations: int = 10,
+        dilation_iter: int = 3, 
+        closing_iter: int = 2
+    ) -> str:
     """
     This function creates and exports meshes for each label in a given image.
     
@@ -690,25 +749,27 @@ def create_and_export_meshes(cell_labels: list, image_path: str, output_dir:str,
     - voxel_resolution (np.ndarray): The resolution of the voxels in the image.
     - make_shell (bool, optional): Whether to create a shell when creating the meshes. Defaults to True.
     - dilation_iter (int, optional): The number of iterations for the dilation operation. Defaults to 3.
-    - closing_iter (int, optional): The number of iterations for the closing operation. Defaults to 3.
+    - closing_iter (int, optional): The number of iterations for the closing operation. Defaults to 2.
     
     Returns:
     - str: The path to the directory where the meshes were saved.
     """
     
+    print('-------------------------------------------')
+    print('Creating meshes from labeled img...')
+
     # Read the image
     if image_path.endswith('.npy'):
-        labels = np.load(image_path)
+        labeled_img = np.load(image_path)
     else:
-        labels = io.imread(image_path)
-    # labels = np.load(image_path)
+        labeled_img = io.imread(image_path)
     
     # Initialize an empty mesh list
     labels_list = []
     
-    for label in cell_labels:
+    for label in tqdm(cell_labels, desc='Converting labels to meshes'):
         # Create a boolean mask for the current label
-        mask = np.array(labels == label).astype(int)
+        mask = np.array(labeled_img == label).astype(int)
 
         # Create a mesh from the mask using trimesh
         mesh = convert_cell_labels_to_meshes(mask, voxel_resolution=voxel_resolution, smoothing_iterations=smoothing_iterations)
@@ -716,7 +777,7 @@ def create_and_export_meshes(cell_labels: list, image_path: str, output_dir:str,
 
     # Make a combined mesh
     if make_shell:
-        big_mask = np.isin(labels, cell_labels)
+        big_mask = np.isin(labeled_img, cell_labels)
         
         # Apply dilation and closing to the big mask
         big_mask = binary_dilation(big_mask, iterations=dilation_iter)
@@ -745,9 +806,16 @@ def create_and_export_meshes(cell_labels: list, image_path: str, output_dir:str,
 
 
 #---------------------------------------------------------------------------------------------------------------
-def mesh_process_clean(label_path: str, output_dir: str, label_list: list, voxel_resolution: np.ndarray, 
-                       scale_factor: float = 1e-6, min_edge_length: float = 0.9, 
-                       make_shell: bool = True, inter_meshes: bool = True):
+def mesh_process_clean(
+        label_path: str, 
+        output_dir: str, 
+        label_list: list, 
+        voxel_resolution: np.ndarray, 
+        scale_factor: float = 1e-6, 
+        min_edge_length: float = 0.9, 
+        make_shell: bool = True, 
+        inter_meshes: bool = True
+    ):
     """
     This function processes a mesh by cleaning, remeshing, converting to vtk format, merging, and adding cell data for SimuCell3D.
     
@@ -765,7 +833,6 @@ def mesh_process_clean(label_path: str, output_dir: str, label_list: list, voxel
     - str: The path to the final merged vtk file.
     """
     
-    
     # Create the meshes
     unclean_mesh_dir = create_and_export_meshes(
         cell_labels=label_list, 
@@ -776,12 +843,16 @@ def mesh_process_clean(label_path: str, output_dir: str, label_list: list, voxel
     )
 
     # Clean the meshes for the first time
+    print('-------------------------------------------')
+    print('First mesh cleaning...')
     first_clean_mesh_dir = clean_meshes_in_directory(
         unclean_mesh_dir, 
         output_directory=os.path.join(unclean_mesh_dir, 'first_cleaned_meshes')
     )
 
     # Remesh the cleaned meshes
+    print('-------------------------------------------')
+    print('First mesh cleaning...')
     remeshed_directory = remesh(
         first_clean_mesh_dir, 
         output_dir=os.path.join(unclean_mesh_dir, 'remeshed_meshes'), 
@@ -789,18 +860,24 @@ def mesh_process_clean(label_path: str, output_dir: str, label_list: list, voxel
     )
 
     # Clean the remeshed meshes
+    print('-------------------------------------------')
+    print('Second mesh cleaning...')
     second_clean_mesh_dir = clean_meshes_in_directory(
         remeshed_directory, 
         output_directory=os.path.join(unclean_mesh_dir, 'second_cleaned_meshes')
     )
     
     # Create the vtk files
+    print('-------------------------------------------')
+    print('Getting `.vtk` files...')
     vtk_directory = convert_to_vtk(
         second_clean_mesh_dir, 
         output_dir=os.path.join(unclean_mesh_dir, 'vtk_files')
     )
     
     # Scale and merge the vtk files
+    print('-------------------------------------------')
+    print('Preparing file for simulation...')
     merged_file, label_dict = merge_vtk_files(vtk_directory, scale_factor=scale_factor)
     
     # Add cell data to the merged vtk file
@@ -848,21 +925,22 @@ def read_cell_ids(input_data):
 #---------------------------------------------------------------------------------------------------------------
 def isolate_filtered_meshes(input_dir: str, output_dir: str, filtered_cell_ids: list):
     # Create the output directory
-    os.makedirs(output_dir, exist_ok=True)
+    copy_dir = os.path.join(output_dir, 'stl_files')
+    os.makedirs(copy_dir, exist_ok=True)
 
     # Get the list of files in the input directory
     files = os.listdir(input_dir)
 
     # Iterate through the files
-    for file in files:
-        # Get the cell ID from the file name in the form of cell_{id+1}.stl
-        cell_id = int(file.split('_')[1].split('.')[0]) + 1
+    for file in tqdm(files, desc='Moving mesh files'):
+        # Get the cell ID from the file name in the form of cell_{id}.stl
+        cell_id = int(file.split('_')[1].split('.')[0])
 
         # If the cell ID is in the filtered_cell_ids list, copy the file to the output directory
         if cell_id in filtered_cell_ids:
-            shutil.copy(os.path.join(input_dir, file), os.path.join(output_dir, file))
+            shutil.copy(os.path.join(input_dir, file), os.path.join(copy_dir, file))
     
-    convert_to_vtk(output_dir, os.path.join(output_dir, "vtk_cells"))
+    convert_to_vtk(input_dir=copy_dir, output_dir=os.path.join(output_dir, "vtk_cells"))
     
 #---------------------------------------------------------------------------------------------------------------
 

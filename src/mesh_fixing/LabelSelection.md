@@ -9,7 +9,10 @@ This guide will walk you through the process of isolating a patch of cells for u
 Before you begin, you will need the following:
 
 - ParaView installed on your machine. You can download it from [here](https://www.paraview.org/download/).
+
 - A mesh file (.vtk or .stl format) representing your cell data.
+
+- Python modules `pymeshlab` ([link](https://github.com/cnr-isti-vclab/PyMeshLab)) and `pymeshfix` ([link](https://github.com/pyvista/pymeshfix)) installed in your environment. Notice that if you already have `vtk` module installed, it is suggested to install ` pymeshfix` without its dependencies, i.e., `pip install pymeshfix --no-dependencies`.
 
 - It may be a good idea to initially isolate cells that do not touch the borders before beggining this step. Refer to the notebook for isolation of the cells from a list of "filtered" labels.
 
