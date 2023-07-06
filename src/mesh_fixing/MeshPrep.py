@@ -608,7 +608,7 @@ def merge_vtk_files(input_dir: str, scale_factor: float = 1e-6):
 
             # If the filename contains "large_mesh", assign label 4, else assign 0
             # TODO: Make this more general
-            label = 4 if 'large_mesh' in filename else 0
+            label = 1 if 'large_mesh' in filename else 0
 
             # Add the label to cell_labels dictionary with sequence index as the key
             cell_labels[index] = label
