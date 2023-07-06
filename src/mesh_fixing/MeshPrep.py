@@ -375,12 +375,13 @@ def separate_cell_points_and_faces(polydata, face_cell_id, point_cell_id):
 
     #Loop over the points Ids and store in which cell they belong
     for pointId in range(polydata.GetNumberOfPoints()):
-        point_dic[point_cell_id[pointId]].append(pointId)
-
+        try:
+            point_dic[point_cell_id[pointId]].append(pointId)
+        except IndexError:
+            continue
 
     #Loop over all the triangles and store them in the cell dic based on their cellIDs
     for faceId in range(polydata.GetNumberOfCells()):
-
         #Extract the points of the face
         face_points = [polydata.GetCell(faceId).GetPointId(i) for i in range(polydata.GetCell(faceId).GetNumberOfPoints())]
         face_dic[face_cell_id[faceId]].append(face_points)
