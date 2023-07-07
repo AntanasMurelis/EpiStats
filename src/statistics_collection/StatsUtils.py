@@ -363,8 +363,23 @@ def compute_cell_contact_area(
 def _compute_2D_area(
         pixel_counts: np.ndarray[int],
         pixel_size: Iterable[float]
-) -> np.ndarray[float]:
+    ) -> np.ndarray[float]:
+    """
+    Given an array of pixel counts for different labels and the size of each pixel, compute the area.
 
+    Parameters:
+    -----------
+        pixel_counts: (np.ndarray[int])
+            An array of pixel counts for each label.
+
+        pixel_size: Iterable[float]
+            The pixel size expressed as a pair of float (in microns).
+    
+    Returns:
+    --------
+        areas: (np.ndarray[float])
+            An array of areas, one value for each label.
+    """
     # Compute areas
     pixel_area = pixel_size[0]*pixel_size[1]
     areas = pixel_counts[1:]*pixel_area
@@ -566,7 +581,7 @@ def _compute_2D_neighbors_along_direction(
 
 	#Check if the label is touching the background above a certain threshold
 	# print(f'Cell {cell_label}: {neighbors}, {counts}')
-	if (0 in neighbors) and (counts[0] > np.sum(counts[:1]) * background_threshold):
+	if (0 in neighbors) and (counts[0] > np.sum(counts) * background_threshold):
 		return [-1]
 	else:
 		#Remove the label of the cell itself, and the label of the background from the neighbors list
@@ -607,7 +622,7 @@ def compute_2D_statistics_along_axis(
             eigen_values, eigen_vectors = tm.inertia.principal_axis(cell_mesh.moment_inertia)
             smallest_eigen_value_idx = np.argmin(np.abs(eigen_values))
             principal_axis = eigen_vectors[smallest_eigen_value_idx]
-            principal_axis = np.asarray(principal_axis) * np.asarray(voxel_size)
+            principal_axis = np.asarray(principal_axis) / np.asarray(voxel_size)
             principal_axis = principal_axis / np.linalg.norm(principal_axis)
 
             binary_img = (labeled_img == label_id).astype(np.uint8)

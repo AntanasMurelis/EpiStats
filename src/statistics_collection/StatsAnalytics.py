@@ -654,3 +654,70 @@ def _get_aboav_law_2D_stats(
         aboav_law_dict[tissue] = {k: (np.mean(v), np.std(v)/np.sqrt(len(v))) for k, v in tissue_dict.items()}
 
     return aboav_law_dict
+#------------------------------------------------------------------------------------------------------------
+
+
+
+#------------------------------------------------------------------------------------------------------------
+def _get_area_CV(
+    df: pd.DataFrame,
+    num_neighbors_lower_threshold: Optional[int] = 3,
+    principal_axis: Optional[bool] = True
+) -> Dict[str, Dict[int, Tuple[float, float]]]:
+    '''
+    Compute the statistics needed for checking 2D Lewis' Law.
+
+    Parameters:
+    -----------
+        df: (pd.DataFrame)
+            The dataframe to compute statistics from.
+        
+        num_neighbors_lower_threshold: (Optional[int], default=3)
+            The threshold under which a cell is excluded from computation.
+        
+        principal_axis (Optional[bool], default=True)
+            If True compute the lewis law statistics for the 2D statistics 
+            collected along cells' principal_axes.
+
+    Returns:
+    --------
+        area_cv_dict: (Dict[str, Dict[int, float]])
+            A nested dictionary. The statistics computed for different tissues are
+            stored in different dictionaries, each associated to the correspondent tissue names key.
+            Each inner dictionary then has number of neighbors values as keys and coefficients of
+            variation of area as values.
+    '''
+
+    if principal_axis:
+        col_num_neighbors = 'num_neighbors_2D_principal'
+        col_area = 'area_2D_principal'
+    else:
+        col_num_neighbors = 'num_neighbors_2D'
+        col_area = 'area_2D'
+
+    tissues = df['tissue'].unique()
+
+    # Gather cell 2D areas by tissue and by number of neighbors
+    stats_2D_dict = {}
+    for tissue in tissues:
+        tissue_df = df[df['tissue'] == tissue]
+        tissue_2D_dict = defaultdict(list)
+        for _, row in tissue_df.iterrows():
+            if row['exclude_cell']:
+                continue
+            else:
+                assert len(row[col_num_neighbors]) == len(row[col_area]), 'Bug in the 2D stats code!'
+                for area, num_neigh in zip(row[col_area], row[col_num_neighbors]):
+                    if num_neigh < num_neighbors_lower_threshold:
+                        continue
+                    else:
+                        tissue_2D_dict[num_neigh].append(area)
+        stats_2D_dict[tissue] = tissue_2D_dict
+    
+    # Compute area CVs
+    area_cv_dict = {}
+    for tissue, tissue_dict in stats_2D_dict.items():
+        area_cv_dict[tissue] = {num: np.std(areas)/np.mean(areas) for num, areas in tissue_dict.items()}
+    
+    return area_cv_dict
+#------------------------------------------------------------------------------------------------------------

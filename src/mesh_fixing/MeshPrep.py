@@ -826,7 +826,7 @@ def mesh_process_clean(
     - label_list (list): A list of labels to be processed.
     - voxel_resolution (np.ndarray): The resolution of the voxels in the image.
     - scale_factor (float, optional): The scale factor to be used when merging vtk files. Defaults to 1e-6.
-    - min_edge_length (float, optional): The minimum edge length to be used when remeshing. Defaults to 0.9.
+    - min_edge_length (float, optional): The minimum edge length to be used when remeshing (in micrometers). Defaults to 0.9.
     - make_shell (bool, optional): Whether to create a shell when creating the meshes. Defaults to True.
     - inter_meshes (bool, optional): Whether to keep the intermediate mesh files. If False, these files will be deleted. Defaults to True.
     
@@ -853,7 +853,7 @@ def mesh_process_clean(
 
     # Remesh the cleaned meshes
     print('-------------------------------------------')
-    print('First mesh cleaning...')
+    print('Remeshing...')
     remeshed_directory = remesh(
         first_clean_mesh_dir, 
         output_dir=os.path.join(unclean_mesh_dir, 'remeshed_meshes'), 
