@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib.colors import ListedColormap
 from scipy import stats
-from StatsAnalytics import standardize, apply_PCA, extract_numerical, _exclude_outliers, _get_lewis_law_2D_stats, _get_aboav_law_2D_stats
+from StatsAnalytics import standardize, apply_PCA, extract_numerical, _exclude_outliers, _get_lewis_law_2D_stats, _get_aboav_law_2D_stats, _get_area_CV
 from typing import Optional, List, Tuple, Iterable, Literal, Union
 
 
@@ -428,6 +428,7 @@ def features_grid_kdplots(
 #------------------------------------------------------------------------------------------------------------
 def num_neighbors_barplots(
     df: pd.DataFrame, 
+    version: Literal['2D', '3D'],
     remove_outliers: Optional[bool] = True,
     color_map: Optional[Union[ListedColormap, str]] = 'viridis',
     save_dir: Optional[str] = None, 
@@ -473,39 +474,68 @@ def num_neighbors_barplots(
         subplot_id += 1
 
         # Subset the data for the current tissue
-        data = df[df['tissue'] == tissue]['num_neighbors']
+        if version == '3D':
+            data = df[df['tissue'] == tissue]['num_neighbors']
+        elif version == '2D':
+            tissue_df = df[df['tissue'] == tissue]
+            data = []
+            for _, row in tissue_df.iterrows():
+                if not row['exclude_cell'] and len(row['num_neighbors_2D_principal']):
+                    data = data + row['num_neighbors_2D_principal']
 
         # Count the frequency of each unique value
         unique_values, counts = np.unique(data, return_counts=True)
+        freqs = counts / len(data)
+        avg_num_neighbors = np.mean(data)
         
         # Make unique_values and counts cover all the span
+        val_freqs_dict = dict(zip(unique_values, freqs))
         val_counts_dict = dict(zip(unique_values, counts))
         for j in range(1, max(unique_values)):
             if j not in unique_values:
+                val_freqs_dict[j] = 0
                 val_counts_dict[j] = 0
 
         # Create a bar plot using Seaborn
         sns.barplot(
-            x=list(val_counts_dict.keys()), 
-            y=list(val_counts_dict.values()), 
+            x=list(val_freqs_dict.keys()), 
+            y=list(val_freqs_dict.values()), 
             color=colors[i], 
             ax=ax
         )
 
+        # Print counts on top of bars
+        for num, count in val_counts_dict.items():
+            ax.annotate(
+                count, xy=(num-1, val_freqs_dict[num]), ha='center', va='bottom'
+            )
+
         # Set title and axes labels
-        ax.set_title(f'{tissue.title()}: {tissue_types[i]}', fontsize=20)
+        ax.set_title(f'{tissue.replace("_", " ").title()}: {tissue_types[i]}', fontsize=20)
         max_x = max(data) + 1
         xlab = 'num_neighbors'.replace("_", " ").title()
         ax.set_xlabel(xlab, fontsize=20)
-        ax.set_xlim([0, max_x])
-        ax.set_xticks(list(val_counts_dict.keys()))
-        ax.set_xticklabels(list(val_counts_dict.keys()))
-        ax.set_ylabel('Counts', fontsize=16)
+        ax.set_xlim([-1, max_x])
+        ax.set_ylim([0, 0.55])
+        ax.set_xticks(np.arange(0, max_x))
+        ax.set_xticklabels(np.arange(1, max_x))
+        ax.set_ylabel('Frequency', fontsize=16)
+        ax.text(
+            x=6, 
+            y=0.3, 
+            s=(
+                f'Average: {round(avg_num_neighbors, 2)}'
+                '\n'
+                f'Tot cells in slices: {len(data)}'
+            ), 
+            style='italic', 
+            fontsize=14
+        )
 
         # Remove the square around the plot
         sns.despine(left=False, bottom=False, top=True, right=True)
 
-    fig.suptitle("Number of neighbors comparison", fontsize=24)
+    fig.suptitle(f"Number of {version} neighbors comparison", fontsize=24)
     fig.subplots_adjust(top=0.8)
 
     # Save the current plot
@@ -896,7 +926,6 @@ def lewis_law_2D_plots(
         plt.show()
     else:
         plt.close()
-
 #------------------------------------------------------------------------------------------------------------
 
 
@@ -1022,6 +1051,111 @@ def aboav_wearie_2D_plots(
     else:
         plt.close()
 
+#------------------------------------------------------------------------------------------------------------
+
+
+
+#------------------------------------------------------------------------------------------------------------
+def area_variability_plots(
+    df: pd.DataFrame,
+    version: Literal['standard', 'principal'] = 'standard',
+    remove_outliers: Optional[bool] = True,
+    color_map: Optional[Union[ListedColormap, str]] = 'viridis',
+    save_dir: Optional[str] = None,     
+    show: Optional[bool] = False 
+) -> None:
+    '''
+    Make a plot of to empirically check the 2D Lewis Law across different slices of tissues.
+
+    Parameters:
+    -----------
+        df: (pd.DataFrame)
+            The input dataframe.
+
+        version: (Literal['standard', 'principal'], default='standard')
+            If 'standard', 2D statistics collected along coordinate axis
+            are considered. If 'principal', 2D stats collected along cells'
+            principal axes are considered instead.
+
+        remove_outliers: (Optional[bool], default=True)
+            If true, outliers are removed from the dataframe.
+
+        color_map: (Optional[Union[ListedColormap, str]], default='viridis')
+            Either a pre-defined colormap or a user defined ListedColormap object.
+        
+        save_dir: (Optional[str], default=None)
+            The path to the directory in which the plot is saved.
+        
+        show: (Optional[bool], default=False)
+            If `True` show the plot when calling the function.
+    '''
+
+    if remove_outliers:
+        df = _exclude_outliers(df)   
+
+    tissues = df['tissue'].unique()
+    tissue_types = df['tissue_type'].unique()
+    
+    if isinstance(color_map, str):
+        colors = sns.color_palette(color_map, len(tissues))
+    elif isinstance(color_map, ListedColormap):
+        colors = color_map.colors
+
+    area_stats = _get_area_CV(
+        df, principal_axis=(version=='principal')
+    )
+
+    min_x, max_x = 2, 12
+    max_y = 2.5
+
+    fig = plt.figure(
+        figsize=(len(tissues)*6, 12),
+        constrained_layout=True
+    )
+    fig.suptitle(f"Area variability vs. Number of Neighbors", fontsize=36)
+    subplot_id = 1
+    for i, tissue in enumerate(tissues):
+        # Get the current axis object
+        if len(tissues) <= 3:
+            ax = fig.add_subplot(1, len(tissues), subplot_id)
+        else:
+            ax = fig.add_subplot(2, int(np.ceil(len(tissues)/2)), subplot_id)
+        subplot_id += 1
+
+        data = area_stats[tissue]
+        x = np.asarray(list(data.keys()), dtype=np.int64)
+        y = np.asarray(list(data.values()), dtype=np.float64)
+
+        # Plot the values and the fitted lines
+        ax.scatter(x, y, color=colors[i])
+
+        # Set title and axes labels
+        ax.set_title(f'{tissue.replace("_", " ").title()}: {tissue_types[i].replace("_", " ")}', fontsize=28)
+        ax.set_xlabel(r'Number of neighbors $(n)$', fontsize=24)
+        ax.set_ylabel(r'Area CV', fontsize=24)
+        ax.set_xticks(np.arange(min_x, max_x))
+
+        # Set axes limits
+        # ax.set_xlim([min_x, max_x])
+        ax.set_ylim([0, max_y])
+
+        # Remove the square around the plot
+        sns.despine(left=False, bottom=False, top=True, right=True)
+    
+    # plt.subplots_adjust(top=0.8)
+
+    # Save the current plot
+    if save_dir:
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+        save_name = f"area_variability_plots.jpg"
+        plt.savefig(os.path.join(save_dir, save_name), bbox_inches='tight', dpi=150) 
+
+    # Show the plot
+    if show:
+        plt.show()
+    else:
+        plt.close()
 #------------------------------------------------------------------------------------------------------------
 
 

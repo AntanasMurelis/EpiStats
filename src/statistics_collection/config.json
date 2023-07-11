@@ -1,16 +1,16 @@
 {
-    "input_path": "./curated_labels/bladder_control_curated_segmentation.tif",
-    "output_path": "./run_euler/outputs/output",
-    "tissue": "bladder",
-    "erosion_iters": 6,
-    "dilation_iters": 8,
-    "smoothing_iters": 10,
-    "voxel_size": [0.21, 0.21, 0.39],
-    "num_2D_slices": 50,
+    "input_path": "./curated_labels/intestine_sample2_b_curated_segmentation_relabel_seq.tif",
+    "output_path": "../outputs/try",
+    "tissue": "intestine_villus",
+    "erosion_iters": 1,
+    "dilation_iters": 2,
+    "smoothing_iters": 5,
+    "voxel_size": [0.325, 0.325, 0.25],
+    "num_2D_slices": 10,
     "size_2D_slices": 200,
     "mesh_format": "stl",
-    "max_workers": 8,
-    "features": ["area", "volume", "elongation_and_axes", "neighbors", "contact_area", "2D_statistics", "2D_statistics_principal_axis"],
+    "max_workers": 4,
+    "features": ["area", "volume", "principal_axis_and_elongation", "neighbors", "contact_area", "2D_statistics", "2D_statistics_along_axes"],
     "load_from_cache": false
 }
 

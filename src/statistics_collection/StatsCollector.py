@@ -50,9 +50,9 @@ class StatsCollector:
         meshes=meshes,
         labels=preprocessed_labeled_img,
         features=[
-            'area', 'volume', 'elongation_and_axes', 
+            'area', 'volume', 'principal_axis_and_elongation', 
             'neighbors', 'contact_area', '2D_statistics', '
-            2D_statistics_principal_axis'
+            2D_statistics_along_axes'
         ],
         output_directory='/output',
         path_to_img='/output/processed_labels.tif',
@@ -78,17 +78,21 @@ class StatsCollector:
             num_workers: int
         ) -> None:
 
-        self.features = features 
-        self.functions = [
+        self._avail_features = [
+            "area", "volume", "principal_axis_and_elongation", 
+            "neighbors", "contact_area", "2D_statistics", 
+            "2D_statistics_along_axes"
+        ]
+        self._avail_functions = [
             compute_cell_surface_areas,
             compute_cell_volumes,
             compute_cell_principal_axis_and_elongation,
             compute_cell_neighbors,
             compute_cell_contact_area,
             compute_2D_statistics,
-            compute_2D_statistics_along_axis
+            compute_2D_statistics_along_axes
         ]
-        self._features_to_functions = dict(zip(self.features, self.functions))
+        self._features_to_functions = dict(zip(self._avail_features, self._avail_functions))
         self._avail_tissues = [
             'bladder', 'intestine_villus', 'lung_bronchiole', 'esophagus', 'embryo', 'lung'
         ]
@@ -99,6 +103,8 @@ class StatsCollector:
         self._tissues_to_types = dict(zip(self._avail_tissues, self._avail_tissue_types))
         self._avail_slicing_dims = [0, 2, 1, 0, 2, 1]
         self._tissues_to_slicing_dims = dict(zip(self._avail_tissues, self._avail_slicing_dims))
+        self.features = features
+        self.functions = [self._features_to_functions[feat] for feat in features]
         self.tissue = tissue
         self.tissue_type = self._tissues_to_types[tissue]
         self.meshes = meshes
@@ -216,9 +222,14 @@ class StatsCollector:
                 feature_data = StatsCollector._unpack_feature_dict(feature_dict[i])
                 #add column to df
                 self.df[feat_names[i]] = feature_data 
-        elif feature_name == '2D_statistics_principal_axis':
-            for i in range(3):
-                feat_names = ['neighbors_2D_principal', 'area_2D_principal', 'slices_principal']
+        elif feature_name == '2D_statistics_along_axes':
+            for i in range(4):
+                feat_names = [
+                    'neighbors_2D_principal', 
+                    'area_2D_principal',
+                    'neighbors_of_neighbors_2D_principal', 
+                    'slices_principal'
+                ]
                 #unpack the dictionary
                 feature_data = StatsCollector._unpack_feature_dict(feature_dict[i])
                 #add column to df
@@ -290,7 +301,7 @@ class StatsCollector:
                 np.concatenate((self.voxel_size[:self.slicing_dim], 
                                 self.voxel_size[(self.slicing_dim+1):]))
             )
-        elif feature_name == '2D_statistics_principal_axis':
+        elif feature_name == '2D_statistics_along_axes':
             args = (
                 self.labels,
                 self.meshes,
