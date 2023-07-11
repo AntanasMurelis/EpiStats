@@ -632,7 +632,7 @@ def compute_2D_statistics_along_axes(
     areas_dict = {}
     neighbors_of_neighbors_dict = {}
     slices_dict = {}
-    for label_id in tqdm(label_ids[1:], desc='Computing 2D statistics'):
+    for label_id in tqdm(label_ids[1:], desc='Computing 2D statistics along apical-basal axis:'):
         if label_id in exclude_labels:
             neighbors_dict[label_id] = []
             areas_dict[label_id] = []
@@ -676,8 +676,7 @@ def compute_2D_statistics_along_axes(
                     grid_coords=grid_coords[i],
                     principal_axis_pts=cell_principal_vectors,
                     principal_axes=cell_principal_axes,
-                    grid_to_place=grid,
-                    show_logs=False
+                    grid_to_place=grid
                 )
                 if neighbors_of_neighbors_in_slice:
                     cell_neighbors_of_neighbors[len(neighbors_in_slice)].append(neighbors_of_neighbors_in_slice)
