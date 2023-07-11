@@ -301,7 +301,7 @@ class StatsCollector:
                 np.concatenate((self.voxel_size[:self.slicing_dim], 
                                 self.voxel_size[(self.slicing_dim+1):]))
             )
-        elif feature_name == '2D_statistics_principal_axis':
+        elif feature_name == '2D_statistics_along_axes':
             args = (
                 self.labels,
                 self.meshes,

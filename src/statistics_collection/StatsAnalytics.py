@@ -109,6 +109,8 @@ def prepare_df(
         'num_neighbors_2D_principal', 'neighbors_of_neighbors_2D_principal'
     ]
     for column in list_columns:
+        if column not in merged_df.columns():
+            continue
         merged_df[column] = merged_df[column].apply(lambda x: re.sub(r'(\d)\s', r'\1,', x))
         merged_df[column] = merged_df[column].apply(lambda x: ast.literal_eval(x))
 
