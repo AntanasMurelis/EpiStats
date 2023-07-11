@@ -222,7 +222,7 @@ class StatsCollector:
                 feature_data = StatsCollector._unpack_feature_dict(feature_dict[i])
                 #add column to df
                 self.df[feat_names[i]] = feature_data 
-        elif feature_name == '2D_statistics_principal_axis':
+        elif feature_name == '2D_statistics_along_axes':
             for i in range(4):
                 feat_names = [
                     'neighbors_2D_principal', 
