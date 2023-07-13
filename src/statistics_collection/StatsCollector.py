@@ -332,9 +332,9 @@ class StatsCollector:
             self.df['num_neighbors'] = self.df['neighbors'].apply(lambda x: len(x))
 
         #split elongation and principal axes
-        if 'elongation_and_axes' in self.features:
-            self.df['elongation'] = self.df['elongation_and_axes'].apply(lambda x: x[0])
-            self.df['principal_axes'] = self.df['elongation_and_axes'].apply(lambda x: x[1])
+        if 'principal_axis_and_elongation' in self.features:
+            self.df['elongation'] = self.df['principal_axis_and_elongation'].apply(lambda x: x[0])
+            self.df['principal_axes'] = self.df['principal_axis_and_elongation'].apply(lambda x: x[1])
             self.df.drop(columns=['elongation_and_axes'], inplace=True)
 
         #split and extract statistics from contact area
