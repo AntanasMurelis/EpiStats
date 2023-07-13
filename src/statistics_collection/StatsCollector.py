@@ -51,8 +51,8 @@ class StatsCollector:
         labels=preprocessed_labeled_img,
         features=[
             'area', 'volume', 'principal_axis_and_elongation', 
-            'neighbors', 'contact_area', '2D_statistics', '
-            2D_statistics_along_axes'
+            'neighbors', 'contact_area', '2D_statistics',
+            '2D_statistics_apical_basal'
         ],
         output_directory='/output',
         path_to_img='/output/processed_labels.tif',
@@ -81,7 +81,7 @@ class StatsCollector:
         self._avail_features = [
             "area", "volume", "principal_axis_and_elongation", 
             "neighbors", "contact_area", "2D_statistics", 
-            "2D_statistics_along_axes"
+            "2D_statistics_apical_basal"
         ]
         self._avail_functions = [
             compute_cell_surface_areas,
@@ -222,7 +222,7 @@ class StatsCollector:
                 feature_data = StatsCollector._unpack_feature_dict(feature_dict[i])
                 #add column to df
                 self.df[feat_names[i]] = feature_data 
-        elif feature_name == '2D_statistics_along_axes':
+        elif feature_name == '2D_statistics_apical_basal':
             for i in range(4):
                 feat_names = [
                     'neighbors_2D_principal', 
@@ -301,7 +301,7 @@ class StatsCollector:
                 np.concatenate((self.voxel_size[:self.slicing_dim], 
                                 self.voxel_size[(self.slicing_dim+1):]))
             )
-        elif feature_name == '2D_statistics_along_axes':
+        elif feature_name == '2D_statistics_apical_basal':
             args = (
                 self.labels,
                 self.meshes,
@@ -349,7 +349,7 @@ class StatsCollector:
         if '2D_statistics' in self.features:
             self.df["num_neighbors_2D"] = self.df['neighbors_2D'].apply(lambda x: [len(l) for l in x])
 
-        if '2D_statistics_principal_axis' in self.features:
+        if '2D_statistics_apical_basal' in self.features:
             self.df["num_neighbors_2D_principal"] = self.df['neighbors_2D_principal'].apply(lambda x: [len(l) for l in x])
 
 

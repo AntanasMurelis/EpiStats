@@ -109,7 +109,7 @@ def prepare_df(
         'num_neighbors_2D_principal', 'neighbors_of_neighbors_2D_principal'
     ]
     for column in list_columns:
-        if column not in merged_df.columns():
+        if column not in merged_df.columns:
             continue
         merged_df[column] = merged_df[column].apply(lambda x: re.sub(r'(\d)\s', r'\1,', x))
         merged_df[column] = merged_df[column].apply(lambda x: ast.literal_eval(x))
@@ -590,6 +590,7 @@ def _get_lewis_law_2D_stats(
 def _get_aboav_law_2D_stats(
         df: pd.DataFrame,
         num_neighbors_lower_threshold: Optional[int] = 3,
+        principal_axis: Optional[bool] = True,
         show_logs: Optional[bool] = False
     ) -> Dict[str, Dict[int, float]]:
     '''
@@ -600,6 +601,10 @@ def _get_aboav_law_2D_stats(
         
         num_neighbors_lower_threshold: (Optional[int], default=3)
             The threshold under which a cell is excluded from computation.
+
+        principal_axis (Optional[bool], default=True)
+            If True compute the lewis law statistics for the 2D statistics 
+            collected along cells' principal_axes.
         
         show_logs: (Optional[bool], deafult=False)
             If true messages are print for debugging purpose.
@@ -622,33 +627,43 @@ def _get_aboav_law_2D_stats(
         print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
         tissue_df = df[df['tissue'] == tissue]
         tissue_dict = defaultdict(list)
-        for _, row in tqdm(tissue_df.iterrows(), total=len(tissue_df)):
-            if row['exclude_cell']:
-                continue
-            else:
-                if show_logs:
-                    print('---------------------------------------')
-                    print(f"cell_ID: {row['cell_ID']}")
-                for neighs, num_neighs, slc in zip(row['neighbors_2D'], row['num_neighbors_2D'], row['slices']):
+        if principal_axis:
+            for _, row in tqdm(tissue_df.iterrows(), total=len(tissue_df)):
+                curr_dict = row['neighbors_of_neighbors_2D_principal']
+                for num, neighs in curr_dict.items():
+                    tissue_dict[num] = tissue_dict[num] + neighs
+            tissue_dict = {
+                num : [item for l in lst for item in l] 
+                for num, lst in tissue_dict.items()
+            }
+        else:
+            for _, row in tqdm(tissue_df.iterrows(), total=len(tissue_df)):
+                if row['exclude_cell']:
+                    continue
+                else:
                     if show_logs:
-                        print(f'Curr slice: {slc}, neighbors: {neighs}, num neighbors: {num_neighs}')
-                    if num_neighs < num_neighbors_lower_threshold:
-                        continue
-                    else: 
-                        others_num_neighs = []
-                        for neigh in neighs:
-                            neigh_row = tissue_df[tissue_df['cell_ID'] == neigh]
-                            if neigh_row['exclude_cell'].bool(): #no complete neighborhood!
-                                break
-                            slice_idx = neigh_row['slices'].item().index(slc)
-                            others_num_neighs.append(neigh_row['num_neighbors_2D'].item()[slice_idx])
-                            if show_logs:    
-                                print(f"Current other: {neigh}, slice: {slc}, num neighbors: {neigh_row['num_neighbors_2D'].item()[slice_idx]}")
+                        print('---------------------------------------')
+                        print(f"cell_ID: {row['cell_ID']}")
+                    for neighs, num_neighs, slc in zip(row['neighbors_2D'], row['num_neighbors_2D'], row['slices']):
+                        if show_logs:
+                            print(f'Curr slice: {slc}, neighbors: {neighs}, num neighbors: {num_neighs}')
+                        if num_neighs < num_neighbors_lower_threshold:
+                            continue
+                        else: 
+                            others_num_neighs = []
+                            for neigh in neighs:
+                                neigh_row = tissue_df[tissue_df['cell_ID'] == neigh]
+                                if neigh_row['exclude_cell'].bool(): #no complete neighborhood!
+                                    break
+                                slice_idx = neigh_row['slices'].item().index(slc)
+                                others_num_neighs.append(neigh_row['num_neighbors_2D'].item()[slice_idx])
+                                if show_logs:    
+                                    print(f"Current other: {neigh}, slice: {slc}, num neighbors: {neigh_row['num_neighbors_2D'].item()[slice_idx]}")
 
-                        if len(others_num_neighs) == num_neighs: 
-                            tissue_dict[num_neighs] = tissue_dict[num_neighs] + others_num_neighs
-                            if show_logs:
-                                print(f'Current tissue_dict: {tissue_dict}')
+                            if len(others_num_neighs) == num_neighs: 
+                                tissue_dict[num_neighs] = tissue_dict[num_neighs] + others_num_neighs
+                                if show_logs:
+                                    print(f'Current tissue_dict: {tissue_dict}')
 
         tissue_dict = dict(sorted(tissue_dict.items()))
         if show_logs:

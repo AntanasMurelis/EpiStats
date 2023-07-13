@@ -517,8 +517,8 @@ def num_neighbors_barplots(
         ax.set_xlabel(xlab, fontsize=20)
         ax.set_xlim([-1, max_x])
         ax.set_ylim([0, 0.55])
-        ax.set_xticks(np.arange(0, max_x))
-        ax.set_xticklabels(np.arange(1, max_x))
+        # ax.set_xticks(np.arange(0, max_x))
+        # ax.set_xticklabels(np.arange(1, max_x))
         ax.set_ylabel('Frequency', fontsize=16)
         ax.text(
             x=6, 
@@ -933,6 +933,8 @@ def lewis_law_2D_plots(
 #------------------------------------------------------------------------------------------------------------
 def aboav_wearie_2D_plots(
     df: pd.DataFrame,
+    version: Literal['standard', 'principal'] = 'standard',
+    fitted: Optional[bool] = True,
     remove_outliers: Optional[bool] = True,
     color_map: Optional[Union[ListedColormap, str]] = 'viridis',
     save_dir: Optional[str] = None,     
@@ -946,8 +948,13 @@ def aboav_wearie_2D_plots(
         df: (pd.DataFrame)
             The input dataframe.
         
-        fit_degrees: (Optional[Iterable[int]], default=[1,2])
-            The degree of the polynomial fitted on the data in the plots.
+        version: (Literal['standard', 'principal'], default='standard')
+            If 'standard', 2D statistics collected along coordinate axis
+            are considered. If 'principal', 2D stats collected along cells'
+            principal axes are considered instead.
+        
+        fitted: (Optional[bool], default=True)
+            If true fit a line through the data and plot it.
 
         remove_outliers: (Optional[bool], default=True)
             If true, outliers are removed from the dataframe.
@@ -973,16 +980,22 @@ def aboav_wearie_2D_plots(
     elif isinstance(color_map, ListedColormap):
         colors = color_map.colors
 
-    aboav_law_stats = _get_aboav_law_2D_stats(df)
+    aboav_law_stats = _get_aboav_law_2D_stats(
+        df, principal_axis=(version=='principal')
+    )
 
-    min_x, max_x = 2, 16
-    min_y, max_y = 10, 85
+    if version == 'standard':
+        min_x, max_x = 2, 16
+        min_y, max_y = 10, 85
+    else:
+        min_x, max_x = 1, 12
+        min_y, max_y = 5, 65     
 
     fig = plt.figure(
         figsize=(len(tissues)*6, 12),
         constrained_layout=True
     )
-    fig.suptitle(f"Aboav-Weaire Law for 2D cell area", fontsize=36)
+    fig.suptitle(f"Aboav-Weaire Law for 2D slices along {version} axes", fontsize=36)
     subplot_id = 1
     for i, tissue in enumerate(tissues):
         # Get the current axis object
@@ -1009,25 +1022,32 @@ def aboav_wearie_2D_plots(
             color='blue', linestyle='-.', 
             label=f'Theoretical line'
         )
-        linear, = ax.plot(
-            x_fit, y_fit, 
-            color='red', linestyle='--', 
-            label=f'Linear fit, coeff: a={round(coeff_set[1], 2)}, b={round(coeff_set[0], 2)}'
-        )
+        if fitted:
+            linear, = ax.plot(
+                x_fit, y_fit, 
+                color='red', linestyle='--', 
+                label=f'Linear fit, coeff: a={round(coeff_set[1], 2)}, b={round(coeff_set[0], 2)}'
+            )
 
         # Set title and axes labels
         ax.set_title(f'{tissue.replace("_", " ").title()}: {tissue_types[i].replace("_", " ")}', fontsize=28)
         ax.set_xlabel(r'Number of neighbors $(n)$', fontsize=24)
         ax.set_ylabel(r'${m_n}n$', fontsize=24)
         ax.set_xticks(x_fit)
-        ax.legend(handles=[theoretical, linear], loc='upper left', fontsize=16)
+        if fitted:
+            legend_items = [theoretical, linear]
+            legend_text = 'Theoretical line eq: ${m_n}n = 8 + 5n$ \nFitted line eq: $y=a+bx$'
+        else:
+            legend_items = [theoretical]
+            legend_text = 'Theoretical line eq: ${m_n}n = 8 + 5n$'
+        ax.legend(handles=legend_items, loc='upper left', fontsize=16)
         ax.text(
-            x=11, 
+            x=7, 
             y=25, 
-            s='Theoretical line eq: ${m_n}n = 8 + 5n$ \nFitted line eq: $y=a+bx$', 
+            s=legend_text, 
             style='italic', 
             fontsize=12
-        )
+        )  
 
         # Set axes limits
         ax.set_xlim([min_x, max_x])
@@ -1042,7 +1062,7 @@ def aboav_wearie_2D_plots(
     if save_dir:
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
-        save_name = f"aboav_law_2D_plots.jpg"
+        save_name = f"aboav_law_2D_{version}_plots.jpg"
         plt.savefig(os.path.join(save_dir, save_name), bbox_inches='tight', dpi=150) 
 
     # Show the plot

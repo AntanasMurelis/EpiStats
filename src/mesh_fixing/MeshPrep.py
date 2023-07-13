@@ -18,6 +18,7 @@ import shutil
 from skimage import io
 """Script for remeshing and preparing meshes for the SimuCell3D."""
 
+
 #---------------------------------------------------------------------------------------------------------------
 def get_edges_with_more_than_two_faces(mesh: trimesh.Trimesh):
     """
