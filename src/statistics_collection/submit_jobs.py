@@ -38,7 +38,7 @@ def create_slurm(
 
 #SBATCH -n 1
 #SBATCH --cpus-per-task={max_workers}
-#SBATCH --time=12:00:00
+#SBATCH --time=72:00:00
 #SBATCH --mem-per-cpu=16384
 
 python src/statistics_collection/run.py --config {config_file}   
@@ -61,7 +61,13 @@ with open("src/statistics_collection/config.json", "r") as file:
     curr_config = json.load(file)
 
 #Set ranges of parameters to modify in the config
-tissues = ['intestine_villus', 'lung_bronchiole', 'bladder', 'esophagus', 'lung']
+tissues = [
+    'intestine_villus', 
+    'lung_bronchiole', 
+    'bladder', 
+    'esophagus', 
+    'lung'
+]
 voxel_sizes = [
     [0.325, 0.325, 0.25],
     [0.1625, 0.1625, 0.25],
