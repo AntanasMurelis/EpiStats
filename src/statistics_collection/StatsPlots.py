@@ -1226,7 +1226,7 @@ def violin_plots(
 
     sns.set(style="whitegrid")
 
-    tissue_df = df[df['tissue' == tissue]]
+    tissue_df = df[df['tissue_type'] == tissue]
     num_plots = len(features)
     fig, axes = plt.subplots(1, num_plots, figsize=(5*num_plots, 10), sharey=False)
     fig.suptitle(f'Morphological statistics distribution in {tissue} sample', fontsize=30)
@@ -1238,7 +1238,7 @@ def violin_plots(
         colors = color_map.colors
 
     for i, feature in enumerate(features):
-        data = tissue_df.loc[[feature]]
+        data = tissue_df.loc[:, feature]
         unit_of_measure = units_of_measure[i]
         sns.violinplot(data=data, orient="v", cut=0, inner="quartile", ax=axes[i], color=colors[i])
         sns.stripplot(data=data, color=".3", size=4, jitter=True, ax=axes[i])
