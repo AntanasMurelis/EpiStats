@@ -1,16 +1,16 @@
 {
-    "input_path": "./curated_labels/intestine_sample2_b_curated_segmentation_relabel_seq.tif",
-    "output_path": "./run_euler/outputs/output",
-    "tissue": "intestine_villus",
-    "erosion_iters": 6,
-    "dilation_iters": 8,
-    "smoothing_iters": 10,
-    "voxel_size": [0.325, 0.325, 0.25],
-    "num_2D_slices": 50,
-    "size_2D_slices": 200,
+    "input_path": "/Volumes/iber/Projects/Early_Embryo/maoxia/movie_0608_3/curation/cell_boundary_time_20.tif",
+    "output_path": "/Volumes/iber/Projects/Early_Embryo/maoxia/movie_0608_3/stats",
+    "tissue": "embryo",
+    "erosion_iters": 2,
+    "dilation_iters": 3,
+    "smoothing_iters": 4,
+    "voxel_size": [0.218, 0.218, 0.763],
+    "num_2D_slices": 0,
+    "size_2D_slices": 0,
     "mesh_format": "stl",
-    "max_workers": 8,
-    "features": ["area", "volume", "principal_axis_and_elongation", "neighbors", "contact_area", "2D_statistics", "2D_statistics_apical_basal"],
+    "max_workers": 4,
+    "features": ["area", "volume", "principal_axis_and_elongation", "neighbors", "contact_area"],
     "load_from_cache": false
 }
 
