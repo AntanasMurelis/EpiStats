@@ -24,7 +24,7 @@ class StatsCollector:
         
         features: (List[str])
             A list of features to compute. Can be chosen among:
-            ['area', 'volume', 'elongation_and_axes', 'neighbors', 'contact_area'].
+            ['area', 'volume', 'principal_axis_and_elongation', 'neighbors', 'contact_area'].
         
         output_directory: (str)
             Path to the directory in which statistics will be saved.
@@ -335,7 +335,7 @@ class StatsCollector:
         if 'principal_axis_and_elongation' in self.features:
             self.df['elongation'] = self.df['principal_axis_and_elongation'].apply(lambda x: x[0])
             self.df['principal_axes'] = self.df['principal_axis_and_elongation'].apply(lambda x: x[1])
-            self.df.drop(columns=['elongation_and_axes'], inplace=True)
+            self.df.drop(columns=['principal_axis_and_elongation'], inplace=True)
 
         #split and extract statistics from contact area
         if 'contact_area' in self.features:
