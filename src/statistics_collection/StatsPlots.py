@@ -388,7 +388,7 @@ def features_grid_kdplots(
                     color=colors[i], 
                     ax=ax
                 )
-                ax.set_xticks(np.arange(min_x, max_x, 1))
+                ax.set_xticks(np.arange(min_x-1, max_x, 1))
 
             if unit_of_measure:
                 xlab = column.replace("_", " ").title() + f" ({unit_of_measure})"
