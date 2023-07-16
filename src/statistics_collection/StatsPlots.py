@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 import seaborn as sns
 from matplotlib.colors import ListedColormap
 from scipy import stats
@@ -313,24 +314,25 @@ def features_grid_kdplots(
         colors = color_map.colors
 
     fig = plt.figure(
-        figsize=(len(features)*5, len(tissues)*4),
+        figsize=(len(features)*7, len(tissues)*5.5),
         constrained_layout=True
     )
-    fig.suptitle("Morphological cell statistics comparison", fontsize=44)
+    fig.suptitle("Morphological cell statistics comparison", fontsize=60)
     subfigs = fig.subfigures(len(tissues), 1)
 
     for i, tissue in enumerate(tissues):
         subfig = subfigs[i] 
         subfig.suptitle(
             f"{tissue.replace('_', ' ').title()}: {tissue_types[i].replace('_', ' ')}",
-            fontsize=36
+            fontsize=44
         )
         subplot_id = 1
         for j, column in enumerate(features):
 
             # Find the max on the x and y-axes to have the same axes length
             max_x = max(df[column])
-            lim_x = max_x + 0.1*max_x
+            min_x = min(df[column])
+            lim_x = [min_x - 0.2*min_x, max_x + 0.1*max_x]
 
             # Get the unit of measure
             unit_of_measure = units_of_measure[j]
@@ -352,7 +354,7 @@ def features_grid_kdplots(
                     color=colors[i], 
                     alpha=0.66,
                     ax=ax, 
-                    clip=(0.0, lim_x)
+                    # clip=lim_x
                 )
 
                 # Map rugplot to the axes, using height to adjust the size of the ticks
@@ -363,6 +365,12 @@ def features_grid_kdplots(
                     color=colors[i], 
                     ax=ax
                 )
+                # format the x-axis ticks in scientific notation
+                ax.xaxis.set_major_formatter(ticker.ScalarFormatter())
+                ax.ticklabel_format(axis="x", style="sci", scilimits=(0,0))
+                x_offset = ax.xaxis.get_offset_text()
+                x_offset.set_size(18)
+
             else:
                 # Count the frequency of each unique value
                 unique_values, counts = np.unique(tissue_df[column], return_counts=True)
@@ -380,8 +388,7 @@ def features_grid_kdplots(
                     color=colors[i], 
                     ax=ax
                 )
-
-                ax.set_xticks(np.arange(0, max_x, 2))
+                ax.set_xticks(np.arange(min_x, max_x, 1))
 
             if unit_of_measure:
                 xlab = column.replace("_", " ").title() + f" ({unit_of_measure})"
@@ -389,22 +396,33 @@ def features_grid_kdplots(
                 xlab = column.replace("_", " ").title()
 
             # Set x-axis stuff
-            ax.set_xlim([0, lim_x])
+            ax.set_xlim(lim_x) if column != 'num_neighbors' else ax.set_xlim(lim_x[0]-1, lim_x[1])
             if i == (len(tissues)-1):
-                ax.set_xlabel(xlab, fontsize=22)
+                ax.set_xlabel(xlab, fontsize=32)
             else:
                 ax.set_xlabel("")
                 ax.set_xticks([])
-            
+            # set the x-axis tick font size
+            for tick in ax.xaxis.get_major_ticks():
+                tick.label1.set_fontsize(20)  
+
             # Set y-axis stuff
             ax.set_ylabel("")
-            ax.set_yticks([])
+            # ax.set_yticks([])
             ax.set_ylim([0, y_lims[j]])
             if j == 0:
-                ax.set_ylabel('Density', fontsize=22)
+                ax.set_ylabel('Density', fontsize=32)
+            # set the y-axis tick font size
+            for tick in ax.yaxis.get_major_ticks():
+                tick.label1.set_fontsize(20)  
+            # format the y-axis ticks in scientific notation
+            ax.ticklabel_format(axis="y", style="sci", scilimits=(0,0))
+            y_offset = ax.yaxis.get_offset_text()
+            y_offset.set_size(18)
             
             # Remove the square around the plot
             sns.despine(left=False, bottom=False, top=True, right=True)
+            
         
         # Set common y-axis for a certain column
 
