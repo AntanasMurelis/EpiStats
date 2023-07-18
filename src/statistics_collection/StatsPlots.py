@@ -212,8 +212,9 @@ def pca_plots(
     # PCA Scatterplot
     tissues = df['tissue'].unique()
     tissue_types = df['tissue_type'].unique()
-    tissue_to_float = dict(zip(tissues, np.linspace(0, 1, len(tissues))))
-    tissue_ids = [tissue_to_float[tissue] for tissue in df['tissue']]
+    tissues = np.resize(tissues, len(tissue_types))
+    tissue_to_float = dict(zip(tissue_types, np.linspace(0, 1, len(tissue_types))))
+    tissue_ids = [tissue_to_float[tissue] for tissue in df['tissue_type']]
 
     fig = plt.figure(figsize=(16, 10))
     ax = plt.subplot()
@@ -307,6 +308,7 @@ def features_grid_kdplots(
 
     tissues = df['tissue'].unique()
     tissue_types = df['tissue_type'].unique()
+    tissues = np.resize(tissues, len(tissue_types))
 
     if isinstance(color_map, str):
         colors = sns.color_palette(color_map, len(tissues))
@@ -320,10 +322,10 @@ def features_grid_kdplots(
     fig.suptitle("Morphological cell statistics comparison", fontsize=60)
     subfigs = fig.subfigures(len(tissues), 1)
 
-    for i, tissue in enumerate(tissues):
+    for i, tissue in enumerate(tissue_types):
         subfig = subfigs[i] 
         subfig.suptitle(
-            f"{tissue.replace('_', ' ').title()}: {tissue_types[i].replace('_', ' ')}",
+            f"{tissues[i].replace('_', ' ').title()}: {tissue_types[i].replace('_', ' ')}",
             fontsize=44
         )
         subplot_id = 1
@@ -343,7 +345,7 @@ def features_grid_kdplots(
             subplot_id += 1
 
             # Subset the data for the current tissue
-            tissue_df = df[df['tissue'] == tissue]
+            tissue_df = df[df['tissue_type'] == tissue]
 
             if column != 'num_neighbors':
                 # Map kernel density plot onto the axes, using shading and color

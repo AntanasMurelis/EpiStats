@@ -1,5 +1,5 @@
 {
-    "input_path": "/Volumes/iber/Projects/Early_Embryo/maoxia/movie_0608_3/curation/cell_boundary_time_20.tif",
+    "input_path": "/Volumes/iber/Projects/Early_Embryo/maoxia/movie_0608_3/curation/cell_boundary_time_21.tif",
     "output_path": "/Volumes/iber/Projects/Early_Embryo/maoxia/movie_0608_3/stats",
     "tissue": "embryo",
     "erosion_iters": 2,
