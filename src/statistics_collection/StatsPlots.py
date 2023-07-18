@@ -480,6 +480,7 @@ def num_neighbors_barplots(
 
     tissues = df['tissue'].unique()
     tissue_types = df['tissue_type'].unique()
+    tissues = np.resize(tissues, len(tissue_types))
 
     if isinstance(color_map, str):
         colors = sns.color_palette(color_map, len(tissues))
@@ -488,16 +489,16 @@ def num_neighbors_barplots(
 
     fig = plt.figure(figsize=(len(tissues)*7, 5))
     subplot_id = 1
-    for i, tissue in enumerate(tissues):
+    for i, tissue in enumerate(tissue_types):
         # Get the current axis object
         ax = fig.add_subplot(1, len(tissues), subplot_id)
         subplot_id += 1
 
         # Subset the data for the current tissue
         if version == '3D':
-            data = df[df['tissue'] == tissue]['num_neighbors']
+            data = df[df['tissue_type'] == tissue]['num_neighbors']
         elif version == '2D':
-            tissue_df = df[df['tissue'] == tissue]
+            tissue_df = df[df['tissue_type'] == tissue]
             data = []
             for _, row in tissue_df.iterrows():
                 if not row['exclude_cell'] and len(row['num_neighbors_2D_principal']):
@@ -531,7 +532,7 @@ def num_neighbors_barplots(
             )
 
         # Set title and axes labels
-        ax.set_title(f'{tissue.replace("_", " ").title()}: {tissue_types[i]}', fontsize=20)
+        ax.set_title(f'{tissues[i].replace("_", " ").title()}: {tissue_types[i]}', fontsize=20)
         max_x = max(data) + 1
         xlab = 'num_neighbors'.replace("_", " ").title()
         ax.set_xlabel(xlab, fontsize=20)
@@ -541,12 +542,12 @@ def num_neighbors_barplots(
         # ax.set_xticklabels(np.arange(1, max_x))
         ax.set_ylabel('Frequency', fontsize=16)
         ax.text(
-            x=6, 
+            x=3, 
             y=0.3, 
             s=(
                 f'Average: {round(avg_num_neighbors, 2)}'
                 '\n'
-                f'Tot cells in slices: {len(data)}'
+                f'Total number of cells: {len(data)}'
             ), 
             style='italic', 
             fontsize=14
