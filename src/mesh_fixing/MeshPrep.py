@@ -485,7 +485,7 @@ def write_unstructured_grid(
     
     # Add CELL_DATA section with metadata, if a label is provided
     if label_of_the_cell is not None:
-        f.write("CELL_DATA {}\n".format(face_dic.__len__()))  # Add this line
+        f.write("CELL_DATA {}\n".format(face_dic.__len__()))
         f.write("SCALARS cell_ids int\nLOOKUP_TABLE default\n")
         for _ in range(len(face_dic)):
             f.write("{}\n".format(label_of_the_cell))
