@@ -780,9 +780,9 @@ def create_and_export_meshes(
     if make_shell:
         big_mask = np.isin(labeled_img, cell_labels)
         
-        # # Apply dilation and closing to the big mask
-        # big_mask = binary_dilation(big_mask, iterations=dilation_iter)
-        # big_mask = binary_closing(big_mask, iterations=closing_iter)
+        # Apply dilation and closing to the big mask
+        big_mask = binary_dilation(big_mask, iterations=dilation_iter)
+        big_mask = binary_closing(big_mask, iterations=closing_iter)
         
         big_mesh = convert_cell_labels_to_meshes(big_mask, voxel_resolution=voxel_resolution, smoothing_iterations=smoothing_iterations//2)
     
