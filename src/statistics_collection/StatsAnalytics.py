@@ -106,8 +106,10 @@ def prepare_df(
         'neighbors', 'neighbors_2D', 'area_2D', 
         'contact_area_distribution', 'num_neighbors_2D', 'slices',
         'neighbors_2D_principal', 'area_2D_principal', 'slices_principal',
-        'num_neighbors_2D_principal', 'neighbors_of_neighbors_2D_principal'
+        'neighbors_of_neighbors_2D_principal', 
+        'num_neighbors_2D_principal'
     ]
+
     for column in list_columns:
         if column not in merged_df.columns:
             continue
