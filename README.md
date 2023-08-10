@@ -2,11 +2,10 @@
 
 This repository contains tools for computing and plotting morphological statistics of cells in 3D images of epithelial tissues. It also provides methods to transform the segmented cells into mesh files and to fix these meshes in case they present any issue.
 
-<table>
+<table border="0">
   <tr>
-    <td><img src="./results/screening_dashboard_type_1.jpg" alt="Type 1 dashboard"></td>
-    <td><img src="./results/screening_dashboard_type_2.jpg" alt="Type 2 dashboard"></td>
-    <td><img src="./results/screening_dashboard_type_2.jpg" alt="Type 2 dashboard"></td>
+    <td><img src="https://github.com/AntanasMurelis/EpiStats/blob/main/images/segmentation.png" alt="Segmented image" width="600"></td>
+    <td><img src="https://github.com/AntanasMurelis/EpiStats/blob/main/images/meshes_group.png" alt="Meshes" width="600"></td>
   </tr>
 </table>
 
