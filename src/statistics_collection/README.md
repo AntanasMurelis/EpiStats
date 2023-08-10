@@ -19,8 +19,23 @@ python path/to/run_collection.py --config path/to/config/file
 #### 2. Statistics collection for multiple samples in parallel (on cluster)
 - Set your parameters in the config file.
 - In `config.json` you don't need to specify `input_path`, `tissue`, and `voxel_size`, since they depend on the specific sample. Instead, you have to insert them in `submit_jobs.py` script as follows:
+  <br>
   
-- The generate a SLURM command  (e.g., `sbatch -n 1 --cpus-per-task=1 --time=4:00:00 --mem-per-cpu=1024 --wrap="python path/to/submit_jobs.py"`) and run it in the terminal. Before executing be careful that the paths to all the scripts and the config file in `submit_jobs.py` are consistent.
+  ![set_tissues](https://github.com/AntanasMurelis/EpiStats/blob/dev_fede/images/info_run_collection_1.png)
+  ![set_voxel_sizes](https://github.com/AntanasMurelis/EpiStats/blob/dev_fede/images/info_run_collection_2.png)
+  ![set_paths](https://github.com/AntanasMurelis/EpiStats/blob/dev_fede/images/info_run_collection_3.png)
+
+- Check that the paths files/scripts in `submit_jobs.py` are consistent:
+  <br>
+  
+  ![check_path_1](https://github.com/AntanasMurelis/EpiStats/blob/dev_fede/images/info_run_collection_5.png)
+  ![check_path_2](https://github.com/AntanasMurelis/EpiStats/blob/dev_fede/images/info_run_collection_4.png)
+
+- Generate a SLURM command to launch `submit_jobs.py` on cluster and run it in the terminal:
+```
+sbatch -n 1 --cpus-per-task=1 --time=4:00:00 --mem-per-cpu=1024 --wrap="python path/to/submit_jobs.py"
+```
+
 
 **NOTE: Output format of statistics collection on cluster**
 The statistics collection pipeline automatically generates output directories with the follwing format:
