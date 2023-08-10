@@ -1,25 +1,28 @@
 # Statistics Collection pipeline
 The directory `src/statistics_collection` contains different scripts to collect morpohological statistics from different types of cellular tissues.
 
-## Content
+## CONTENT:
 We list here the content of this directory, giving a brief explanation of each file:
-- `misc.py`: helper functions for the rest of the code.
-- `LabelPreprocessing.py`: functions to perform post-processing of labeled 3D images of segmented tissues.
-- `GenMeshes.py`: functions to generate meshes from post-processed images of segmented cells.
-- `StatsUtils.py`: functions to compute morpholgical statistics either from labeled images or meshes.
-- `ExtendedTrimesh.py`: class to compute contact area between cells.
-- `StatsCollector.py`: class to collect statistics using the aforementioned functions and to store them in dataframes.
-- `config.json`: stores parameters used for running the statistics collection pipeline.
-- `run.py`: functions to execute the pipeline.
-- `submit_jobs.py`: functions to automatically generate SLURM scripts to run parallel statistics collection from different samples on cluster. 
-- `StatsAnalytics.py`: functions to clean/post-process the cell statistics dataframes and prepare it for plots.
-- `StatsPlots.py`: functions to get different plots.
+- `config.json`: parameters used for running the statistics collection pipeline.
+- `dataset_preparation.py`: post-process statistics dataset to save them and for plotting.
+- `run_collection.py`: run a single instance of statistics collection pipeline.
+- `submit_jobs.py`: automatically generate SLURM scripts to run parallel statistics collections on cluster. 
 
-## How to run
-- To run a single statistics collection you first need to set your parameters in the `config.json` file. Then it is sufficient to run the following: ``python path/to/run.py --config path/to/config/file``.
-- To run one or more parallel statistics collection on the cluster you need to set your parameters in the config file (except for `input_path`, `tissue`, and `voxel_size`, which depend on the sample, and hence have to be inserted in the appropriate space in the `submit_jobs.py` script). The generate a SLURM command  (e.g., `sbatch -n 1 --cpus-per-task=1 --time=4:00:00 --mem-per-cpu=1024 --wrap="python path/to/submit_jobs.py"`) and run it in the terminal. Before executing be careful that the paths to all the scripts and the config file in `submit_jobs.py` are consistent.
+## HOW TO:
+#### 1. Statistics collection for a single sample
+- Set your parameters in the `config.json` file.
+- Run the following command:
 
-## Output format
+```
+python path/to/run_collection.py --config path/to/config/file
+```
+#### 2. Statistics collection for multiple samples in parallel (on cluster)
+- Set your parameters in the config file.
+- In `config.json` you don't need to specify `input_path`, `tissue`, and `voxel_size`, since they depend on the specific sample. Instead, you have to insert them in `submit_jobs.py` script as follows:
+  
+- The generate a SLURM command  (e.g., `sbatch -n 1 --cpus-per-task=1 --time=4:00:00 --mem-per-cpu=1024 --wrap="python path/to/submit_jobs.py"`) and run it in the terminal. Before executing be careful that the paths to all the scripts and the config file in `submit_jobs.py` are consistent.
+
+**NOTE: Output format of statistics collection on cluster**
 The statistics collection pipeline automatically generates output directories with the follwing format:
 
 ![Screenshot 2023-06-13 230257](https://github.com/AntanasMurelis/EpiStats/assets/74301866/36be0a26-b402-4982-b0d5-35c47315d5a4)
