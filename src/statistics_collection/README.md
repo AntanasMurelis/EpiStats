@@ -36,14 +36,24 @@ python path/to/run_collection.py --config path/to/config/file
 sbatch -n 1 --cpus-per-task=1 --time=4:00:00 --mem-per-cpu=1024 --wrap="python path/to/submit_jobs.py"
 ```
 
-#### 3. Gather outputs of statistics collection from multiple tissues
+#### 3. Post-process outputs of statistics collection from multiple tissues
+- Post-processing consists of:
+  1. Merging datasets associated to different tissues/samples,
+  2. Extracting a dataset of only selected numerical features for plotting,
+  3. Computing PCs (and related information) for plotting,
+  4. Extracting statistics from 2D slices for plotting Lewis law and Aboav-Weaire law.
+  5. Saving all the results in the output directory.
+
+- After having specified the requested input parameters (check script), run:
+  ```
+  python path/to/dataset_preparation.py
+  ```
+
+#### 4. Plotting
+Check the notebook `src/notebooks/plot_tutorial.ipynb`, a tutorial showing how the dataframes should be loaded and processed, and how to call plotting functions is reported in the directory.
 
 
-#### Make plots
-A jupyter notebook tutorial showing how the dataframes should be loaded and processed, and how to call plotting functions is reported in the directory `src/notebooks/plot_tutorial.ipynb`.
-
-
-## NOTES: 
+## ADDITIONAL NOTES: 
 #### 1. Output format of statistics collection on cluster
 The statistics collection pipeline automatically generates output directories with the follwing format:
 
@@ -56,6 +66,20 @@ The statistics collection pipeline automatically generates output directories wi
 - The `processed_label.tif` file stores the post-processed labeled 3D image. 
 
 #### 2. Set proper time duration for the job
+If you want collect 2D statistics (area, neighbors) for 2D slices along the apical-basal axis of each cell, be aware that the computation may require some time. Indeed, the algorithm has `O(n^2 * num_slices_per_cell)` time complexity, where `n` is the number of cells in the sample, and there are some functions that are not fully optimized due time shortage.
+
+I will provide here some examples as a reference for possible time duration of statistics collection runs (50 slices along apical-basal axes):
+
+- 50 cells --> ~1/2 hrs
+- 150 cells --> ~8/10 hrs
+- 300 cells --> ~1.5/2 days
+- 500 cells --> ~4/5 days
+
+If you are dealing with a large sample you can:
+1. Set a longer reserved time for your jobs in `submit_jobs.py`:
+   
 ![check_path_2](https://github.com/AntanasMurelis/EpiStats/blob/dev_fede/images/info_run_collection_6.png)
+
+2. Reduce the number of slices along apical-basal axes (e.g. from 50 to 20)
 
 
