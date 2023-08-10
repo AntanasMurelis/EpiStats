@@ -4,14 +4,22 @@ This repository contains tools for computing and plotting morphological statisti
 
 ## Installation
 Install venv if not already done
-```pip3 install virtualenv```
+```bash
+pip3 install virtualenv
+```
 
 Create a virtual environment
-```python3 -m venv EpiStatsVenv```
+```bash
+python3 -m venv EpiStatsVenv
+```
 
 Activate the virtual env
-```source ./EpiStatsVenv/bin/activate```
+```bash
+source ./EpiStatsVenv/bin/activate
+```
 
 Install the required packages
-```pip3 install -r requirements.txt```
+```bash
+pip3 install -r requirements.txt
+```
 
