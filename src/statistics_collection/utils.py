@@ -13,6 +13,7 @@ import trimesh as tm
 from types import SimpleNamespace
 from typing import Union, Tuple, Optional, List, Dict, Iterable
 
+
 #------------------------------------------------------------------------------------------------------------
 def load_labeled_img(
         labeled_img: Union[str, np.ndarray]
