@@ -36,8 +36,15 @@ python path/to/run_collection.py --config path/to/config/file
 sbatch -n 1 --cpus-per-task=1 --time=4:00:00 --mem-per-cpu=1024 --wrap="python path/to/submit_jobs.py"
 ```
 
+#### 3. Gather outputs of statistics collection from multiple tissues
 
-**NOTE: Output format of statistics collection on cluster**
+
+#### Make plots
+A jupyter notebook tutorial showing how the dataframes should be loaded and processed, and how to call plotting functions is reported in the directory `src/notebooks/plot_tutorial.ipynb`.
+
+
+## NOTES: 
+#### 1. Output format of statistics collection on cluster
 The statistics collection pipeline automatically generates output directories with the follwing format:
 
 ![Screenshot 2023-06-13 230257](https://github.com/AntanasMurelis/EpiStats/assets/74301866/36be0a26-b402-4982-b0d5-35c47315d5a4)
@@ -48,6 +55,7 @@ The statistics collection pipeline automatically generates output directories wi
 - The `cut_cell_idxs.txt` just stores the indexes of the so-called cut cells (i.e. touching the image boundaries).
 - The `processed_label.tif` file stores the post-processed labeled 3D image. 
 
-## About plots
-A jupyter notebook tutorial showing how the dataframes should be loaded and processed, and how to call plotting functions is reported in the directory `src/tutorial`.
+#### 2. Set proper time duration for the job
+![check_path_2](https://github.com/AntanasMurelis/EpiStats/blob/dev_fede/images/info_run_collection_6.png)
+
 
