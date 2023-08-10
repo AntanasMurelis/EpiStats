@@ -9,7 +9,7 @@ This repository contains tools for computing and plotting morphological statisti
   </tr>
 </table>
 
-## Installation
+## INSTALLATION:
 Install venv if not already done
 ```bash
 pip3 install virtualenv
@@ -30,3 +30,14 @@ Install the required packages
 pip3 install -r requirements.txt
 ```
 
+
+## USAGE:
+- Scripts for morphological statistics computation, data post-processing, and plotting is in
+  ```
+  src/statistics_collection/
+  ```
+- Scripts for mesh refinement is in
+  ```
+  src/mesh_fixing
+  ```
+ 
