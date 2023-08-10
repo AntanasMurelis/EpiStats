@@ -41,7 +41,7 @@ def create_slurm(
 #SBATCH --time=72:00:00
 #SBATCH --mem-per-cpu=16384
 
-python src/statistics_collection/run.py --config {config_file}   
+python src/statistics_collection/run_collection.py --config {config_file}   
     """
 
     script_file = f'submit_training_{name}.sh'
