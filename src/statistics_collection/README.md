@@ -1,25 +1,60 @@
 # Statistics Collection pipeline
 The directory `src/statistics_collection` contains different scripts to collect morpohological statistics from different types of cellular tissues.
 
-## Content
+## CONTENT:
 We list here the content of this directory, giving a brief explanation of each file:
-- `misc.py`: helper functions for the rest of the code.
-- `LabelPreprocessing.py`: functions to perform post-processing of labeled 3D images of segmented tissues.
-- `GenMeshes.py`: functions to generate meshes from post-processed images of segmented cells.
-- `StatsUtils.py`: functions to compute morpholgical statistics either from labeled images or meshes.
-- `ExtendedTrimesh.py`: class to compute contact area between cells.
-- `StatsCollector.py`: class to collect statistics using the aforementioned functions and to store them in dataframes.
-- `config.json`: stores parameters used for running the statistics collection pipeline.
-- `run.py`: functions to execute the pipeline.
-- `submit_jobs.py`: functions to automatically generate SLURM scripts to run parallel statistics collection from different samples on cluster. 
-- `StatsAnalytics.py`: functions to clean/post-process the cell statistics dataframes and prepare it for plots.
-- `StatsPlots.py`: functions to get different plots.
+- `config.json`: parameters used for running the statistics collection pipeline.
+- `dataset_preparation.py`: post-process statistics dataset to save them and for plotting.
+- `run_collection.py`: run a single instance of statistics collection pipeline.
+- `submit_jobs.py`: automatically generate SLURM scripts to run parallel statistics collections on cluster. 
 
-## How to run
-- To run a single statistics collection you first need to set your parameters in the `config.json` file. Then it is sufficient to run the following: ``python path/to/run.py --config path/to/config/file``.
-- To run one or more parallel statistics collection on the cluster you need to set your parameters in the config file (except for `input_path`, `tissue`, and `voxel_size`, which depend on the sample, and hence have to be inserted in the appropriate space in the `submit_jobs.py` script). The generate a SLURM command  (e.g., `sbatch -n 1 --cpus-per-task=1 --time=4:00:00 --mem-per-cpu=1024 --wrap="python path/to/submit_jobs.py"`) and run it in the terminal. Before executing be careful that the paths to all the scripts and the config file in `submit_jobs.py` are consistent.
+## HOW TO:
+#### 1. Statistics collection for a single sample
+- Set your parameters in the `config.json` file.
+- Run the following command:
 
-## Output format
+```
+python path/to/run_collection.py --config path/to/config/file
+```
+#### 2. Statistics collection for multiple samples in parallel (on cluster)
+- Set your parameters in the config file.
+- In `config.json` you don't need to specify `input_path`, `tissue`, and `voxel_size`, since they depend on the specific sample. Instead, you have to insert them in `submit_jobs.py` script as follows:
+  <br>
+  
+  ![set_tissues](https://github.com/AntanasMurelis/EpiStats/blob/dev_fede/images/info_run_collection_1.png)
+  ![set_voxel_sizes](https://github.com/AntanasMurelis/EpiStats/blob/dev_fede/images/info_run_collection_2.png)
+  ![set_paths](https://github.com/AntanasMurelis/EpiStats/blob/dev_fede/images/info_run_collection_3.png)
+
+- Check that the paths files/scripts in `submit_jobs.py` are consistent:
+  <br>
+  
+  ![check_path_1](https://github.com/AntanasMurelis/EpiStats/blob/dev_fede/images/info_run_collection_5.png)
+  ![check_path_2](https://github.com/AntanasMurelis/EpiStats/blob/dev_fede/images/info_run_collection_4.png)
+
+- Generate a SLURM command to launch `submit_jobs.py` on cluster and run it in the terminal:
+```
+sbatch -n 1 --cpus-per-task=1 --time=4:00:00 --mem-per-cpu=1024 --wrap="python path/to/submit_jobs.py"
+```
+
+#### 3. Post-process outputs of statistics collection from multiple tissues
+- Post-processing consists of:
+  1. Merging datasets associated to different tissues/samples,
+  2. Extracting a dataset of only selected numerical features for plotting,
+  3. Computing PCs (and related information) for plotting,
+  4. Extracting statistics from 2D slices for plotting Lewis law and Aboav-Weaire law.
+  5. Saving all the results in the output directory.
+
+- After having specified the requested input parameters (check script), run:
+  ```
+  python path/to/dataset_preparation.py
+  ```
+
+#### 4. Plotting
+Check the notebook `src/notebooks/plot_tutorial.ipynb`, a tutorial showing how the dataframes should be loaded and processed, and how to call plotting functions is reported in the directory.
+
+
+## ADDITIONAL NOTES: 
+#### 1. Output format of statistics collection on cluster
 The statistics collection pipeline automatically generates output directories with the follwing format:
 
 ![Screenshot 2023-06-13 230257](https://github.com/AntanasMurelis/EpiStats/assets/74301866/36be0a26-b402-4982-b0d5-35c47315d5a4)
@@ -30,6 +65,21 @@ The statistics collection pipeline automatically generates output directories wi
 - The `cut_cell_idxs.txt` just stores the indexes of the so-called cut cells (i.e. touching the image boundaries).
 - The `processed_label.tif` file stores the post-processed labeled 3D image. 
 
-## About plots
-A jupyter notebook tutorial showing how the dataframes should be loaded and processed, and how to call plotting functions is reported in the directory `src/tutorial`.
+#### 2. Set proper time duration for the job
+If you want collect 2D statistics (area, neighbors) for 2D slices along the apical-basal axis of each cell, be aware that the computation may require some time. Indeed, the algorithm has `O(n^2 * num_slices_per_cell)` time complexity, where `n` is the number of cells in the sample, and there are some functions that are not fully optimized due time shortage.
+
+I will provide here some examples as a reference for possible time duration of statistics collection runs (50 slices along apical-basal axes):
+
+- 50 cells --> ~1/2 hrs
+- 150 cells --> ~8/10 hrs
+- 300 cells --> ~1.5/2 days
+- 500 cells --> ~4/5 days
+
+If you are dealing with a large sample you can:
+1. Set a longer reserved time for your jobs in `submit_jobs.py`:
+   
+![check_path_2](https://github.com/AntanasMurelis/EpiStats/blob/dev_fede/images/info_run_collection_6.png)
+
+2. Reduce the number of slices along apical-basal axes (e.g. from 50 to 20)
+
 

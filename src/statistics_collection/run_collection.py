@@ -4,10 +4,10 @@ Run this script to collect statistics from epithelial tissues.
 
 import os
 import argparse
-from misc import create_output_directory, load_labeled_img, read_config
-from StatsCollector import StatsCollector
-from LabelPreprocessing import process_labels
-from GenMeshes import convert_labels_to_meshes
+from scripts.utils import create_output_directory, load_labeled_img, read_config
+from scripts.StatsCollector import StatsCollector
+from scripts.LabelPreprocessing import process_labels
+from scripts.GenMeshes import convert_labels_to_meshes
 
 def main(config_path):
 
