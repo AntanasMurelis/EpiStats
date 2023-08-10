@@ -13,9 +13,10 @@ from sys import argv
 import numpy as np 
 from os import path
 import pandas as pd
-from typing import Union, List, Tuple
+from typing import Union, List, Tuple, Optional
 import shutil
 from skimage import io
+from scipy.ndimage import binary_dilation, binary_closing
 """Script for remeshing and preparing meshes for the SimuCell3D."""
 
 
@@ -485,7 +486,7 @@ def write_unstructured_grid(
     
     # Add CELL_DATA section with metadata, if a label is provided
     if label_of_the_cell is not None:
-        f.write("CELL_DATA {}\n".format(face_dic.__len__()))  # Add this line
+        f.write("CELL_DATA {}\n".format(face_dic.__len__()))
         f.write("SCALARS cell_ids int\nLOOKUP_TABLE default\n")
         for _ in range(len(face_dic)):
             f.write("{}\n".format(label_of_the_cell))
@@ -660,11 +661,11 @@ def add_cell_data_to_vtk(vtk_file, cell_labels):
 
 #---------------------------------------------------------------------------------------------------------------
 def convert_cell_labels_to_meshes(
-    img,
-    voxel_resolution,
-    smoothing_iterations=1,
-    output_directory='output',
-    pad_width=10,
+    img: np.ndarray[float],
+    voxel_resolution: np.ndarray[float],
+    smoothing_iterations: Optional[int] = 1,
+    output_directory: Optional[str] = 'output',
+    pad_width: Optional[int] = 10,
 ):
     """
     Convert the labels of the cells in the 3D segmented image to triangular meshes. Please make sure that the 
@@ -729,8 +730,6 @@ def convert_cell_labels_to_meshes(
 
 
 #---------------------------------------------------------------------------------------------------------------
-from scipy.ndimage import binary_dilation, binary_closing
-
 def create_and_export_meshes(
         cell_labels: list, 
         image_path: str, 
@@ -785,7 +784,7 @@ def create_and_export_meshes(
         big_mask = binary_dilation(big_mask, iterations=dilation_iter)
         big_mask = binary_closing(big_mask, iterations=closing_iter)
         
-        big_mesh = convert_cell_labels_to_meshes(big_mask, voxel_resolution=voxel_resolution, smoothing_iterations=10)
+        big_mesh = convert_cell_labels_to_meshes(big_mask, voxel_resolution=voxel_resolution, smoothing_iterations=smoothing_iterations//2)
     
     # Create the output directory if it doesn't exist
     if not os.path.exists(output_dir):
@@ -793,7 +792,7 @@ def create_and_export_meshes(
 
     # Export all the meshes
     for i, cell in enumerate(cell_labels):
-        mesh_file_path = os.path.join(output_dir, f'cell_{cell-1}.stl')
+        mesh_file_path = os.path.join(output_dir, f'cell_{cell}.stl')
         labels_list[i][0].export(mesh_file_path)
         
     if make_shell:
@@ -925,7 +924,29 @@ def read_cell_ids(input_data):
 
 
 #---------------------------------------------------------------------------------------------------------------
-def isolate_filtered_meshes(input_dir: str, output_dir: str, filtered_cell_ids: list):
+def convert_filtered_meshes(
+        input_dir: str, 
+        output_dir: str, 
+        filtered_cell_ids: list
+) -> None:
+    """
+    Copy meshes file from source (input_dir) to destination (output_dir) directory.
+    After being copied the mesh files are converted from their original formal (e.g., 'stl')
+    to the 'vtk' format.
+
+    Parameters:
+    -----------
+    input_dir: (str)
+        The path to the source directory.
+    
+    output_dir: (str)
+        The path to the destination directory.
+
+    filtered_cell_ids: (list)
+        A list containing the indices of "filtered" cells. That is, all the cells whose id 
+        is not in this list are discarded.
+    """
+
     # Create the output directory
     copy_dir = os.path.join(output_dir, 'stl_files')
     os.makedirs(copy_dir, exist_ok=True)
@@ -943,7 +964,6 @@ def isolate_filtered_meshes(input_dir: str, output_dir: str, filtered_cell_ids: 
             shutil.copy(os.path.join(input_dir, file), os.path.join(copy_dir, file))
     
     convert_to_vtk(input_dir=copy_dir, output_dir=os.path.join(output_dir, "vtk_cells"))
-    
 #---------------------------------------------------------------------------------------------------------------
 
 

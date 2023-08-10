@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import ast
 import re
+import warnings
 from tqdm import tqdm
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
@@ -62,16 +63,20 @@ def _merge_dataframes(
     
     if num_dfs == 0:
         raise ValueError("You must pass at least one DataFrame object.")
-    elif num_dfs == 1:
+    if num_dfs == 1:
         if isinstance(dfs, pd.DataFrame):
             merged_df = dfs
         else:
             merged_df = dfs[0]
     else:
+        for i in range(num_dfs - 1):
+            assert set(dfs[i].columns) == set(dfs[i + 1].columns), f"The input datasets {dfs[i]['tissue'][0]} and {dfs[i+1]['tissue'][0]} " +\
+                "do not have the same columns, hence it's not possible to merge them."
+
         merged_df = pd.concat(objs=dfs, axis=0, ignore_index=True)
+
     
     return merged_df
-
 #------------------------------------------------------------------------------------------------------------
 
 
@@ -106,16 +111,18 @@ def prepare_df(
         'neighbors', 'neighbors_2D', 'area_2D', 
         'contact_area_distribution', 'num_neighbors_2D', 'slices',
         'neighbors_2D_principal', 'area_2D_principal', 'slices_principal',
-        'num_neighbors_2D_principal', 'neighbors_of_neighbors_2D_principal'
+        'neighbors_of_neighbors_2D_principal', 
+        'num_neighbors_2D_principal'
     ]
+
     for column in list_columns:
         if column not in merged_df.columns:
+            warnings.warn(f"Column {column} not present in the merged dataframe.")
             continue
         merged_df[column] = merged_df[column].apply(lambda x: re.sub(r'(\d)\s', r'\1,', x))
         merged_df[column] = merged_df[column].apply(lambda x: ast.literal_eval(x))
 
     return merged_df
-
 #------------------------------------------------------------------------------------------------------------
 
 
