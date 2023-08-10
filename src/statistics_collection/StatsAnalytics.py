@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import ast
 import re
+import warnings
 from tqdm import tqdm
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
@@ -62,13 +63,24 @@ def _merge_dataframes(
     
     if num_dfs == 0:
         raise ValueError("You must pass at least one DataFrame object.")
-    elif num_dfs == 1:
+    if num_dfs == 1:
         if isinstance(dfs, pd.DataFrame):
             merged_df = dfs
         else:
             merged_df = dfs[0]
     else:
-        merged_df = pd.concat(objs=dfs, axis=0, ignore_index=True)
+        # make sure all the datasets have the same column names
+        flag = True
+        i = 0
+        while i < (num_dfs - 1) and flag:
+            if all(dfs[i].columns == dfs[i + 1].columns):
+                flag = False
+            i += 1
+        if flag:
+            merged_df = pd.concat(objs=dfs, axis=0, ignore_index=True)
+        else:
+            warnings.warn("The input datasets do not have the same columns, inner join is performed at merging.")
+            merged_df = pd.concat(objs=dfs, axis=0, ignore_index=True, join="inner")
     
     return merged_df
 
@@ -112,7 +124,7 @@ def prepare_df(
 
     for column in list_columns:
         if column not in merged_df.columns:
-            continue
+            warnings.warn(f"Column {column} not present in the merged dataframe.")
         merged_df[column] = merged_df[column].apply(lambda x: re.sub(r'(\d)\s', r'\1,', x))
         merged_df[column] = merged_df[column].apply(lambda x: ast.literal_eval(x))
 
