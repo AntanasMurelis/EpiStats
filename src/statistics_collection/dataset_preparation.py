@@ -155,8 +155,9 @@ def main(
 
 if __name__ =="__main__":
 
+    out_root_path = '/nas/groups/iber/Users/Federico_Carrara/Statistics_Collection/outputs/outputs_v3'
+
     ### SPECIFY PATHS TO INPUT CSV TISSUE DATASETS ###
-    out_root_path = '/nas/groups/iber/Users/Federico_Carrara/Statistics_Collection/outputs/outputs_v4'
     df_files = [
         'output_bladder_control_curated_segmentation_s_10_e_6_d_8/cell_stats/stats_dataset_bladder.csv',
         'output_esophagus_Z2_curated_crop_s_10_e_6_d_8/cell_stats/stats_dataset_esophagus.csv',
@@ -183,12 +184,16 @@ if __name__ =="__main__":
     rename_feats = [] 
     ################################################################
 
+
+    ### SPECIFY OTHER PARAMETERS DIRECTLY IN THE FUNCTION CALL ###
+
+
     main(
         paths_to_tissue_datasets=df_paths,
         numerical_feat=num_features,
         out_dir=output_dir,
         features_to_rename=rename_feats,
-        stats_from_principal_axes=True,
+        stats_from_principal_axes=False,
         remove_na=True,
         find_outliers=True,
         num_2D_neighbors_threshold=3,
