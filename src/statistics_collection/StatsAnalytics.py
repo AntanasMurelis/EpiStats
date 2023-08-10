@@ -69,21 +69,14 @@ def _merge_dataframes(
         else:
             merged_df = dfs[0]
     else:
-        # make sure all the datasets have the same column names
-        flag = True
-        i = 0
-        while i < (num_dfs - 1) and flag:
-            if all(dfs[i].columns == dfs[i + 1].columns):
-                flag = False
-            i += 1
-        if flag:
-            merged_df = pd.concat(objs=dfs, axis=0, ignore_index=True)
-        else:
-            warnings.warn("The input datasets do not have the same columns, inner join is performed at merging.")
-            merged_df = pd.concat(objs=dfs, axis=0, ignore_index=True, join="inner")
+        for i in range(num_dfs - 1):
+            assert set(dfs[i].columns) == set(dfs[i + 1].columns), f"The input datasets {dfs[i]['tissue'][0]} and {dfs[i+1]['tissue'][0]} " +\
+                "do not have the same columns, hence it's not possible to merge them."
+
+        merged_df = pd.concat(objs=dfs, axis=0, ignore_index=True)
+
     
     return merged_df
-
 #------------------------------------------------------------------------------------------------------------
 
 
@@ -125,11 +118,11 @@ def prepare_df(
     for column in list_columns:
         if column not in merged_df.columns:
             warnings.warn(f"Column {column} not present in the merged dataframe.")
+            continue
         merged_df[column] = merged_df[column].apply(lambda x: re.sub(r'(\d)\s', r'\1,', x))
         merged_df[column] = merged_df[column].apply(lambda x: ast.literal_eval(x))
 
     return merged_df
-
 #------------------------------------------------------------------------------------------------------------
 
 
