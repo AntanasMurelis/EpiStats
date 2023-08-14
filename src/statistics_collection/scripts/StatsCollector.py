@@ -4,8 +4,8 @@ import trimesh as tm
 import os
 import pickle
 from typing import Optional, List, Tuple, Iterable, Dict, Union, Callable
-from LabelPreprocessing import get_labels_touching_edges, get_labels_touching_background
-from StatsUtils import *
+from scripts.LabelPreprocessing import get_labels_touching_edges, get_labels_touching_background
+from scripts.StatsUtils import *
 
 #--------------------------------------------------------------------------------------------------
 class StatsCollector:

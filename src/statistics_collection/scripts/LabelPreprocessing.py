@@ -9,7 +9,7 @@ from skimage.measure import regionprops
 from skimage.segmentation import relabel_sequential
 import pyclesperanto_prototype as cle
 from napari_process_points_and_surfaces import label_to_surface
-from misc import load_labeled_img, create_output_directory, custom_showwarning
+from scripts.utils import load_labeled_img, create_output_directory, custom_showwarning
 
 
 #-----------------------------------------------------------------------------------------------------------------------------
