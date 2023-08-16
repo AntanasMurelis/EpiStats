@@ -27,17 +27,17 @@ Before you begin, you will need the following:
 2. **Apply the `extract_by_region` filter.**
 
    With your mesh file selected in the Pipeline Browser, go to `Filters > Extract_by_region`. 
-   ![](../images/Extract_Cells.png)
+   ![](../../images/Extract_Cells.png)
    This will open the `Extract by region` panel. In the panel, from the panel you dhould choose intersect with Sphere, and Extract intersected in the panel. Move the sphere to a region where you believe would result in a spherical sample, and Apply. You may look at the information panel to check how many cells the selection includes.
-   ![](../images/Appended_sphere_display.png)
+   ![](../../images/Appended_sphere_display.png)
    Dilate or retract the sphere to change your selection and hit Apply. Repeat until you obtain a suitable sample.
-   ![](../images/Extract.png)
+   ![](../../images/Extract.png)
 
 3. **Lookup list of labels of cells.**
 
    To obtain the list of cells, one may simply split the view, and choose the Spread sheet View. There, choose "Attribute: Cell data", the cell_ids are in the column. 
-   ![](../images/SpreadSheet.png)
+   ![](../../images/SpreadSheet.png)
 
    A fast way is just to export the clump of meshes as a vtk in ASCII and go to the very bottom of the file and copy the list from there.
-   ![](../images/ASCII_vtk.png)
+   ![](../../images/ASCII_vtk.png)
 
