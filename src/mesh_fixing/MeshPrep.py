@@ -1,20 +1,18 @@
 import trimesh
+import shutil
 import numpy as np
-from collections import Counter
-from itertools import combinations
+import pandas as pd
 import pymeshfix
 import os
 import sys
 import pymeshlab
+import vtk 
+from trimesh.proximity import signed_distance
 from napari_process_points_and_surfaces import label_to_surface
 from tqdm import tqdm
-import vtk 
-from sys import argv
-import numpy as np 
-from os import path
-import pandas as pd
+from collections import Counter
+from itertools import combinations
 from typing import Union, List, Tuple, Optional
-import shutil
 from skimage import io
 from scipy.ndimage import binary_dilation, binary_closing
 """Script for remeshing and preparing meshes for the SimuCell3D."""
@@ -728,6 +726,74 @@ def convert_cell_labels_to_meshes(
 
 
 
+#---------------------------------------------------------------------------------------------------------------
+def create_outer_shell_mesh(
+        meshes: List[trimesh.Trimesh],
+        neighbors: List[List[int]],
+        dist_threshold: float,
+        translation: float,
+) -> trimesh.Trimesh:
+    """
+    Given a list of cell meshes and cell neighbors, create a tight outer shell mesh that contains all the cells.
+
+    ALGORITHM
+    - For each mesh 
+        - Store its vertices as an array of 3D coordinates
+        - For each neighboring mesh:
+            - Compute the distance between the neighboring mesh and all the vertices.
+            - Compare distances for this neighbor and the distance threshold and remove
+              from the vertices list all the vertices whose distance is lower than the threshold
+        - Add the remaining vertices to the list of vertices that will compose the outer shell
+
+    Parameters:
+    -----------
+    meshes: (List[trimesh.Trimesh])
+        A list of meshes in the trimesh format associated to the single cells in the sample.
+
+    neighbors: (List[List[int]])
+        A list whose elements are list of neigbors for each cell
+
+    dist_threshold: (float)
+        The threshold distance under which a vertex is discarded, and hence not used to create the outer shell.
+    
+    translation: (float)
+        The extent of the translation (in microns) to apply to the points of the outer shell, to make sure that 
+        all the cells are well included in the shell.
+
+    Returns:
+    --------
+    outer_shell_mesh: (trimesh.Trimesh)
+        The mesh associated to the outer shell
+    """
+
+    # N.B. Make sure that meshes and neighbors are aligned (i.e. they are ordered and each pair of values
+    # is associated to the same cell id)
+
+    shell_points = []
+
+    for mesh, neigh_idxs in zip(meshes, neighbors):
+        curr_vertices = mesh.vertices
+        for neigh_idx in neigh_idxs:
+            distances = signed_distance(meshes[neigh_idx], curr_vertices)
+            mask = distances > dist_threshold
+            curr_vertices = curr_vertices[mask, :]
+        shell_points.append(curr_vertices)
+
+    # Create mesh from points
+    shell_points = np.concatenate(shell_points)
+    shell_points = trimesh.PointCloud(shell_points)
+    shell_mesh = trimesh.convex.convex_hull(shell_points)
+
+    # Translate points and remesh
+    displacements = translation * shell_mesh.vertex_normals
+    shell_mesh.vertices += displacements
+    shell_mesh = trimesh.convex.convex_hull(shell_mesh.vertices)
+
+    return shell_mesh
+#---------------------------------------------------------------------------------------------------------------
+
+
+
 
 #---------------------------------------------------------------------------------------------------------------
 def create_and_export_meshes(
@@ -766,15 +832,17 @@ def create_and_export_meshes(
         labeled_img = io.imread(image_path)
     
     # Initialize an empty mesh list
-    labels_list = []
+    mesh_lst = []
     
     for label in tqdm(cell_labels, desc='Converting labels to meshes'):
         # Create a boolean mask for the current label
         mask = np.array(labeled_img == label).astype(int)
 
         # Create a mesh from the mask using trimesh
-        mesh = convert_cell_labels_to_meshes(mask, voxel_resolution=voxel_resolution, smoothing_iterations=smoothing_iterations)
-        labels_list.append(mesh)
+        mesh = convert_cell_labels_to_meshes(
+            mask, voxel_resolution=voxel_resolution, smoothing_iterations=smoothing_iterations
+        )
+        mesh_lst.append(mesh)
 
     # Make a combined mesh
     if make_shell:
@@ -784,7 +852,9 @@ def create_and_export_meshes(
         big_mask = binary_dilation(big_mask, iterations=dilation_iter)
         big_mask = binary_closing(big_mask, iterations=closing_iter)
         
-        big_mesh = convert_cell_labels_to_meshes(big_mask, voxel_resolution=voxel_resolution, smoothing_iterations=smoothing_iterations//2)
+        big_mesh = convert_cell_labels_to_meshes(
+            big_mask, voxel_resolution=voxel_resolution, smoothing_iterations=smoothing_iterations
+        )
     
     # Create the output directory if it doesn't exist
     if not os.path.exists(output_dir):
@@ -793,7 +863,7 @@ def create_and_export_meshes(
     # Export all the meshes
     for i, cell in enumerate(cell_labels):
         mesh_file_path = os.path.join(output_dir, f'cell_{cell}.stl')
-        labels_list[i][0].export(mesh_file_path)
+        mesh_lst[i][0].export(mesh_file_path)
         
     if make_shell:
         big_mesh_file_path = os.path.join(output_dir, 'large_mesh.stl')
