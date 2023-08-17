@@ -815,7 +815,7 @@ def mesh_process_clean(
         scale_factor: float = 1e-6, 
         min_edge_length: float = 0.9, 
         make_shell: bool = True, 
-        inter_meshes: bool = True
+        inter_meshes: bool = False
     ):
     """
     This function processes a mesh by cleaning, remeshing, converting to vtk format, merging, and adding cell data for SimuCell3D.
@@ -883,6 +883,9 @@ def mesh_process_clean(
     
     # Add cell data to the merged vtk file
     add_cell_data_to_vtk(merged_file, label_dict)
+
+    # Copy merged file to output directory
+    shutil.copy(merged_file, output_dir)
 
     # Remove intermediate mesh directories if inter_meshes is False
     if not inter_meshes:
