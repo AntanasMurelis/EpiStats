@@ -7,7 +7,6 @@ from tqdm import tqdm
 from skimage.measure import mesh_surface_area
 from collections import defaultdict
 from typing import Optional, List, Tuple, Iterable, Dict, Union
-from ExtendedTrimesh import ExtendedTrimesh
 import napari
 from scipy.spatial.transform import Rotation
 from typing import Union, Optional, Iterable, List, Tuple
@@ -17,7 +16,8 @@ from morphosamplers.sampler import (
     sample_volume_at_coordinates,
 )
 from skimage.measure import regionprops
-from misc import (
+from scripts.ExtendedTrimesh import ExtendedTrimesh
+from scripts.utils import (
     _get_centroid_and_length, 
     _get_rotation, 
     _get_principal_axis, 

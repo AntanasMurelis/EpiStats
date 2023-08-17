@@ -38,7 +38,7 @@ def create_slurm(
 
 #SBATCH -n 1
 #SBATCH --cpus-per-task={max_workers}
-#SBATCH --time=72:00:00
+#SBATCH --time=144:00:00
 #SBATCH --mem-per-cpu=16384
 
 python src/statistics_collection/run_collection.py --config {config_file}   

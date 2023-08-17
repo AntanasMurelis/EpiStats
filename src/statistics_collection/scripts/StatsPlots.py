@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib.colors import ListedColormap
 from scipy import stats
-from StatsAnalytics import standardize, apply_PCA, extract_numerical, _exclude_outliers, _get_lewis_law_2D_stats, _get_aboav_law_2D_stats, _get_area_CV
+from scripts.StatsAnalytics import standardize, apply_PCA, extract_numerical, _exclude_outliers, _get_lewis_law_2D_stats, _get_aboav_law_2D_stats, _get_area_CV
 from typing import Optional, List, Tuple, Iterable, Literal, Union
 
 
