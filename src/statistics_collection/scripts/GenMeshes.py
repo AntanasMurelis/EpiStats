@@ -84,6 +84,3 @@ def convert_labels_to_meshes(
     return mesh_dict
 
 #------------------------------------------------------------------------------------------------------------
-
-
-### MAKE COMBINED MESH, CONVERT TO VTK
