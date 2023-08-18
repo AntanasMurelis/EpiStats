@@ -1,14 +1,17 @@
 import trimesh
 import numpy as np
-import pandas as pd
 import open3d as o3d
 from scipy.spatial import KDTree
 from collections import defaultdict
-from typing import List, Optional, Type
+from typing import List, Optional, Type, Literal
 
 
 #----------------------------------------------------------------------------------------------------------------------------
 class ExtendedTrimesh(trimesh.Trimesh):
+    """
+    Child class of `trimesh.Trimesh`.
+    It adds some attributes and methods that allow to efficiently compute distances of vertices to other close by meshes.
+    """
     def __init__(
             self, 
             neighbors: Optional[List[int]] = None,
@@ -37,7 +40,12 @@ class ExtendedTrimesh(trimesh.Trimesh):
         # K-closest dictionary -> associate to each neighbor index a set of vertices idxs that are within the k-closest 
         # to any other mesh
         self.k_closest_dict = defaultdict(set)
+        # Array storing points to be included in the outer mesh (initialized as empty)
+        self.points = []
+        # Mean distance among each point and its nearest neighbor
+        self.mean_point_distance = None
     
+
     def _get_dist(
             self,
             other: Type['ExtendedTrimesh'],
@@ -100,6 +108,8 @@ class ExtendedTrimesh(trimesh.Trimesh):
             Number of closest vertices to consider.
         """
 
+        k = min(k, len(self.distances))
+
         # Find indices of k closest vertices
         k_closest_idxs = np.argpartition(self.distances, k)[:k]
 
@@ -108,6 +118,119 @@ class ExtendedTrimesh(trimesh.Trimesh):
 
         # Store them in `k_closest_dict`
         for i in range(len(k_closest_idxs)):
-            self.k_closest_dict[k_closest_neigh_idxs[i]] = k_closest_idxs[i]
+            self.k_closest_dict[k_closest_neigh_idxs[i]].add(k_closest_idxs[i])
+
+
+    def threshold_vertices(
+            self,
+            threshold: float,
+    ) -> None:
+        """
+        Discard vertices whose distance is under a threshold, save the remaining in points, and update data structures accordingly.
+
+        Parameters:
+        -----------
+        mesh: (ExtendedTrimesh)
+            An ExtendedTrimesh object to apply thresholding on.
+        
+        threshold: (float)
+            The threshold under which vertices should be discarded.
+        """
+
+        under_threshold_mask = self.distances < threshold
+        self.points = np.asarray(self.vertices)[under_threshold_mask]
+        self.closest_neigh_idxs = self.closest_neigh_idxs[under_threshold_mask]
+
+        # Compute mean distance among every point and its nearest neighbor
+        pc = o3d.geometry.PointCloud()
+        pc.points = o3d.utility.Vector3dVector(self.points)
+        self.mean_point_distance = np.mean(pc.compute_nearest_neighbor_distance())
+
+        # If `k_closest_dict` has already been created, create a new one from scratch
+        if self.k_closest_dict:
+            k = sum([len(val) for val in self.k_closest_dict.values()])
+            self.get_k_closest_vertices(k)
 
 #-----------------------------------------------------------------------------------------------------------------
+
+
+
+#-----------------------------------------------------------------------------------------------------------------
+class OuterShell:
+    """
+    Class that allows to create an OuterShell mesh from a collection of smaller ExtendedTrimesh objects.
+    """
+    def __init__(
+            self,
+            meshes: List[ExtendedTrimesh],
+            neighbors_lst: List[List[int]],
+            min_edge_length: float
+    ):
+        """
+        Parameters:
+        -----------
+        meshes: (List[ExtendedTrimesh])
+            A list of ExtendedTrimesh objects that are meant to build the outer shell. 
+        neighbors_lst: (List[List[int]])
+            A list of neighbors associated to each mesh in meshes
+        min_edge_length: (float)
+            The length in microns of the shortest edge in the target mesh
+        """
+        # The list of meshes contained in the shell (private)
+        self._meshes = meshes if meshes else None
+        # The list of neighbors associated to each mesh in meshes (private)
+        self._neighbors_lst = neighbors_lst if neighbors_lst else None
+        # The length in microns of the shortest edge in the mesh (private)
+        self._min_edge_length = min_edge_length if min_edge_length else None
+        # Attribute meant to store the point cloud of point that should generate the outer shell mesh
+        self.point_cloud = []
+        # Attribute meant to store the final outer shell mesh
+        self.mesh = None
+
+    
+    def get_shell_point_cloud(
+            self,
+            dist_threshold: float
+    ) -> None:
+        """
+        Get the point cloud that will be used to define the outer shell mesh.
+        It is obtained in the following way:
+        - For each mesh in meshes:
+            - Compute the min distances between its vertices and any of the neighboring meshes.
+            - Discard all vertices whose distance is smaller than the threshold
+            - Add the remaining vertices to the outer shell point cloud
+
+        Parameters:
+        -----------
+        dist_threshold: (float)
+            The distance threshold under which vertices are discarded. For simplicity it is expressed in units
+            of `min_edge_length`.
+        """
+
+        self.point_cloud = []
+        for mesh, neigbors in zip(self._meshes, self._neighbors_lst):
+            assert isinstance(mesh, ExtendedTrimesh), "Current mesh is not an ExtendedTrimesh object."
+
+            mesh.compute_min_distances(self.meshes[neigbors])
+            mesh.threshold_vertices(dist_threshold)
+
+            self.point_cloud.append(mesh.points)
+
+        self.point_cloud = np.vstack(self.point_cloud)
+
+    
+    def interpolate_gaps(
+            self,
+            method: Literal['gp', 'spline'] = 'spline'
+    ) -> None:
+        """
+        Discarding points that are too close to another mesh may generate gaps in the outer shell point cloud.
+        This function interpolates points in those gaps using one of the available methods.
+        The pitch of the grid is set as the average edge length over all the meshes.
+        """
+
+
+
+    
+
+        
