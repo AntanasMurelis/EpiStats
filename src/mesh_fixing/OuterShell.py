@@ -1,7 +1,10 @@
 import trimesh
 import numpy as np
 import open3d as o3d
+import math
 from scipy.spatial import KDTree
+import sklearn.gaussian_process as gp
+from scipy.interpolate import bisplrep, bisplev
 from collections import defaultdict
 from typing import List, Optional, Type, Literal
 
@@ -137,7 +140,7 @@ class ExtendedTrimesh(trimesh.Trimesh):
             The threshold under which vertices should be discarded.
         """
 
-        under_threshold_mask = self.distances < threshold
+        under_threshold_mask = self.distances > threshold
         self.points = np.asarray(self.vertices)[under_threshold_mask]
         self.closest_neigh_idxs = self.closest_neigh_idxs[under_threshold_mask]
 
@@ -146,9 +149,10 @@ class ExtendedTrimesh(trimesh.Trimesh):
         pc.points = o3d.utility.Vector3dVector(self.points)
         self.mean_point_distance = np.mean(pc.compute_nearest_neighbor_distance())
 
-        # If `k_closest_dict` has already been created, create a new one from scratch
+        # If `k_closest_dict` has already been created, delete it create a new one from scratch
         if self.k_closest_dict:
             k = sum([len(val) for val in self.k_closest_dict.values()])
+            self.k_closest_dict = defaultdict(set)
             self.get_k_closest_vertices(k)
 
 #-----------------------------------------------------------------------------------------------------------------
@@ -182,8 +186,8 @@ class OuterShell:
         self._neighbors_lst = neighbors_lst if neighbors_lst else None
         # The length in microns of the shortest edge in the mesh (private)
         self._min_edge_length = min_edge_length if min_edge_length else None
-        # Attribute meant to store the point cloud of point that should generate the outer shell mesh
-        self.point_cloud = []
+        # Attribute meant to store the array of points that should generate the outer shell mesh
+        self.points = []
         # Attribute meant to store the final outer shell mesh
         self.mesh = None
 
@@ -207,27 +211,104 @@ class OuterShell:
             of `min_edge_length`.
         """
 
-        self.point_cloud = []
+        shell_points = []
         for mesh, neigbors in zip(self._meshes, self._neighbors_lst):
             assert isinstance(mesh, ExtendedTrimesh), "Current mesh is not an ExtendedTrimesh object."
 
             mesh.compute_min_distances(self.meshes[neigbors])
             mesh.threshold_vertices(dist_threshold)
 
-            self.point_cloud.append(mesh.points)
+            shell_points.append(mesh.points)
 
-        self.point_cloud = np.vstack(self.point_cloud)
+        self.points = np.vstack(shell_points)
 
     
     def interpolate_gaps(
             self,
-            method: Literal['gp', 'spline'] = 'spline'
+            method: Literal['gp', 'spline'] = 'spline',
+            **kwargs
     ) -> None:
         """
         Discarding points that are too close to another mesh may generate gaps in the outer shell point cloud.
         This function interpolates points in those gaps using one of the available methods.
-        The pitch of the grid is set as the average edge length over all the meshes.
+        The step of the grid is set as the average edge length over all the meshes.
+
+        Parameters:
+        -----------
+        method: (Literal['gp', 'spline'], default='spline')
+            The method used to interpolate points in the gaps. 'gp' stands for Gaussian Process, while 'spline' stands 
+            for B-spline interpolation.
         """
+
+        assert self.points, "Before interpolation you have to compute the point cloud for the shell."
+
+        # Train the chosen model on existing data
+        x, y, z = self.points[:, 0], self.points[:, 1], self.points[:, 2]
+
+        if method == "gp":
+            ker = gp.kernels.ConstantKernel(1.0, (1e-1, 1e3)) * gp.kernels.RBF(10.0, (1e-3, 1e3))
+            model = gp.GaussianProcessRegressor(kernel=ker)
+            model.fit(np.column_stack(x, y), z)  
+        elif method == "spline":
+            model = bisplrep(x, y, z)
+        else:
+            NotImplementedError(f"Method {method} is not among the available ones.")
+
+        ### Get grid of x, y values at the gaps
+        # 0. Compute the step of the grid as the average distance between points over all the meshes
+        grid_step = np.mean([mesh.mean_point_distance for mesh in self._meshes]) / math.sqrt(2)
+
+        # 1. Get all pairs of neighbors
+        neighbor_pairs = set()
+        for idx, neighbors in enumerate(self._neighbors_lst):
+            for neighbor in neighbors:
+                pair = tuple(sorted((idx, neighbor)))
+                neighbor_pairs.add(pair)
+        
+        # 2. For each pair:
+        new_shell_points = []
+        for idx_1, idx_2 in neighbor_pairs:
+            # 2.a. Get closest points for each cell in the pair
+            mesh_1, mesh_2 = self._meshes[idx_1], self._meshes[idx_2]
+            closest_point_idxs_1 = mesh_1.k_closest_dict[idx_2]
+            closest_point_idxs_2 = mesh_2.k_closest_dict[idx_1]
+            closest_points = np.concatenate(
+                [mesh_1.points[closest_point_idxs_1], mesh_2.points[closest_point_idxs_2]]
+            )
+
+            # 2.b. Compute grid taking closest points extema on x and y
+            max_x = np.max(closest_points[:, 0])
+            min_x = np.min(closest_points[:, 0])
+            max_y = np.max(closest_points[:, 1])
+            min_y = np.min(closest_points[:, 1])
+            x_grid = np.linspace(min_x, max_x, grid_step)
+            y_grid = np.linspace(min_y, max_y, grid_step)
+            X, Y = np.meshgrid(x_grid, y_grid)
+
+            # 3. Predict on the newly created grid
+            if method == "gp":
+                z_pred = model(np.column_stack(X, Y))
+            elif method =="spline":
+                z_pred = bisplev(X, Y, model)
+            pred_points = np.column_stack(
+                [X.reshape(-1, 1).squeeze(), Y.reshape(-1, 1).squeeze(), z_pred.reshape(-1, 1).squeeze()]
+            )
+
+            # 4. Replace existing points in the grid with the newly fitted ones
+            mesh_1.points = np.remove(mesh_1.points, closest_point_idxs_1)
+            mesh_2.points = np.remove(mesh_2.points, closest_point_idxs_2)
+            new_shell_points.append(
+                np.concatenate(mesh_1.points, mesh_2.points, pred_points)
+            )
+        
+        self.points = self.vstack(new_shell_points)
+
+
+        
+
+
+
+
 
 
 
