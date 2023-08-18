@@ -18,6 +18,7 @@ class ExtendedTrimesh(trimesh.Trimesh):
     def __init__(
             self, 
             neighbors: Optional[List[int]] = None,
+            k_percent: Optional[float] = 0.1,
             *args, **kwargs):
         """
         Initialize the ExtendedTrimesh object.
@@ -27,13 +28,17 @@ class ExtendedTrimesh(trimesh.Trimesh):
         neighbors: (Optional[List[int]] = None)
             A list of neighbors of this mesh
 
+        k_percent: (Optional[float] = 0.1)
+            The percentual of vertices over the total to take as the closest.
+
         *args, **kwargs: 
             Thes refer to the standard parameters for trimesh.Trimesh class (e.g., file name, vertices and faces arrays, etc.)
             Refer to trimesh.Trimesh documentation for more details.
         """
         super().__init__(*args, **kwargs)
-        # Create a KDTree from the vertices of the mesh for quick spatial lookups.
-        self.kdtree = KDTree(self.vertices)  
+
+        # # Create a KDTree from the vertices of the mesh for quick spatial lookups.
+        # self.kdtree = KDTree(np.asarray(self.vertices))  
         # Neighbors list
         self.neighbors = neighbors if neighbors else None
         # Distance of each vertex to the closest mesh
@@ -42,6 +47,7 @@ class ExtendedTrimesh(trimesh.Trimesh):
         self.closest_neigh_idxs = np.zeros(len(self.vertices)) 
         # K-closest dictionary -> associate to each neighbor index a set of vertices idxs that are within the k-closest 
         # to any other mesh
+        self.k = k_percent * len(self.vertices)
         self.k_closest_dict = defaultdict(set)
         # Array storing points to be included in the outer mesh (initialized as empty)
         self.points = []
@@ -70,7 +76,7 @@ class ExtendedTrimesh(trimesh.Trimesh):
         other_distances = np.zeros(len(self.vertices))
         for i, vertex in enumerate(self.vertices):
             # Query the KDtree of `other`
-            other_distances[i] = other.kdtree.query(vertex)
+            other_distances[i] = other.kdtree.query(vertex)[0]
 
         return other_distances
     
@@ -149,11 +155,10 @@ class ExtendedTrimesh(trimesh.Trimesh):
         pc.points = o3d.utility.Vector3dVector(self.points)
         self.mean_point_distance = np.mean(pc.compute_nearest_neighbor_distance())
 
-        # If `k_closest_dict` has already been created, delete it create a new one from scratch
-        if self.k_closest_dict:
-            k = sum([len(val) for val in self.k_closest_dict.values()])
-            self.k_closest_dict = defaultdict(set)
-            self.get_k_closest_vertices(k)
+        # Create `k_closest_dict` with remaining points
+        self.k_closest_dict = defaultdict(set)
+        self.get_k_closest_vertices(self.k)
+        print(self.k_closest_dict)
 
 #-----------------------------------------------------------------------------------------------------------------
 
@@ -162,7 +167,7 @@ class ExtendedTrimesh(trimesh.Trimesh):
 #-----------------------------------------------------------------------------------------------------------------
 class OuterShell:
     """
-    Class that allows to create an OuterShell mesh from a collection of smaller ExtendedTrimesh objects.
+    Create an OuterShell mesh from a collection of smaller ExtendedTrimesh objects.
     """
     def __init__(
             self,
@@ -171,8 +176,11 @@ class OuterShell:
             min_edge_length: float
     ):
         """
+        Create an OuterShell mesh from a collection of smaller ExtendedTrimesh objects.
+
         Parameters:
         -----------
+
         meshes: (List[ExtendedTrimesh])
             A list of ExtendedTrimesh objects that are meant to build the outer shell. 
         neighbors_lst: (List[List[int]])
@@ -212,11 +220,12 @@ class OuterShell:
         """
 
         shell_points = []
-        for mesh, neigbors in zip(self._meshes, self._neighbors_lst):
+        for i, (mesh, neighbors) in enumerate(zip(self._meshes, self._neighbors_lst)):
             assert isinstance(mesh, ExtendedTrimesh), "Current mesh is not an ExtendedTrimesh object."
 
-            mesh.compute_min_distances(self.meshes[neigbors])
-            mesh.threshold_vertices(dist_threshold)
+            mesh.compute_min_distances([self._meshes[neighbor] for neighbor in neighbors])
+            mesh.threshold_vertices(dist_threshold * self._min_edge_length)
+            self._meshes[i] = mesh
 
             shell_points.append(mesh.points)
 
@@ -240,7 +249,7 @@ class OuterShell:
             for B-spline interpolation.
         """
 
-        assert self.points, "Before interpolation you have to compute the point cloud for the shell."
+        assert len(self.points) > 0, "Before interpolation you have to compute the point cloud for the shell."
 
         # Train the chosen model on existing data
         x, y, z = self.points[:, 0], self.points[:, 1], self.points[:, 2]

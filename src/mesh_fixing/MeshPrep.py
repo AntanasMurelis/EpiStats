@@ -7,7 +7,6 @@ import os
 import sys
 import pymeshlab
 import vtk 
-from trimesh.proximity import signed_distance
 from napari_process_points_and_surfaces import label_to_surface
 from tqdm import tqdm
 from collections import Counter
@@ -772,24 +771,48 @@ def create_outer_shell_mesh(
     shell_points = []
 
     for mesh, neigh_idxs in zip(meshes, neighbors):
-        curr_vertices = mesh.vertices
+        print("---------------------------------------------------")
+        print(f"Current mesh: {mesh}, curr neighbors: {neigh_idxs}")
+        curr_vertices = np.asarray(mesh.vertices)
+        print(f"Original num of vertices: {curr_vertices.shape}")
         for neigh_idx in neigh_idxs:
-            distances = signed_distance(meshes[neigh_idx], curr_vertices)
+            distances = - signed_distance(meshes[neigh_idx], curr_vertices)
+            print(f"Max distance: {max(distances)}, mean: {np.mean(distances)}, std: {np.std(distances)}")
             mask = distances > dist_threshold
             curr_vertices = curr_vertices[mask, :]
+            print(f"Remaining num of vertices: {curr_vertices.shape}")
         shell_points.append(curr_vertices)
 
     # Create mesh from points
     shell_points = np.concatenate(shell_points)
-    shell_points = trimesh.PointCloud(shell_points)
-    shell_mesh = trimesh.convex.convex_hull(shell_points)
+    shell_cloud = o3d.geometry.PointCloud()
+    shell_cloud.points = o3d.utility.Vector3dVector(shell_points)
+    shell_cloud.estimate_normals()
+
+    # estimate radius for rolling ball
+    distances = shell_cloud.compute_nearest_neighbor_distance()
+    avg_dist = np.mean(distances)
+    radius = 1.5 * avg_dist   
+
+    # Create mesh in open3d
+    shell_mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(
+        shell_cloud,
+        o3d.utility.DoubleVector([radius, radius * 2])
+    )
+
+    # convert mesh to trimesh
+    shell_mesh = trimesh.Trimesh(
+        np.asarray(shell_mesh.vertices), 
+        np.asarray(shell_mesh.triangles),
+        vertex_normals=np.asarray(shell_mesh.vertex_normals)
+    )
 
     # Translate points and remesh
     displacements = translation * shell_mesh.vertex_normals
     shell_mesh.vertices += displacements
     shell_mesh = trimesh.convex.convex_hull(shell_mesh.vertices)
 
-    return shell_mesh
+    return shell_mesh, shell_cloud, shell_points
 #---------------------------------------------------------------------------------------------------------------
 
 
