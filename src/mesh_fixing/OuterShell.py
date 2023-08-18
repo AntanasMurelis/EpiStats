@@ -291,7 +291,7 @@ class OuterShell:
             elif method =="spline":
                 z_pred = bisplev(X, Y, model)
             pred_points = np.column_stack(
-                [X.reshape(-1, 1).squeeze(), Y.reshape(-1, 1).squeeze(), z_pred.reshape(-1, 1).squeeze()]
+                [X.ravel(), Y.ravel(), z_pred.ravel()]
             )
 
             # 4. Replace existing points in the grid with the newly fitted ones
