@@ -45,10 +45,10 @@ class ExtendedTrimesh(trimesh.Trimesh):
         self.distances = np.full(len(self.vertices), np.inf)
         # Array storing for each vertex the index of the closest neighbors
         self.closest_neigh_idxs = np.zeros(len(self.vertices)) 
-        # K-closest dictionary -> associate to each neighbor index a set of vertices idxs that are within the k-closest 
+        # K-closest dictionary -> associate to each neighbor index a list of vertices idxs that are within the k-closest 
         # to any other mesh
-        self.k = k_percent * len(self.vertices)
-        self.k_closest_dict = defaultdict(set)
+        self.k = int(k_percent * len(self.vertices))
+        self.k_closest_dict = defaultdict(list)
         # Array storing points to be included in the outer mesh (initialized as empty)
         self.points = []
         # Mean distance among each point and its nearest neighbor
@@ -117,6 +117,11 @@ class ExtendedTrimesh(trimesh.Trimesh):
             Number of closest vertices to consider.
         """
 
+        # Check if the dictionary is already populated
+        if len(self.k_closest_dict) > 0:
+            print("K-closest dic is not empty!")
+            self.k_closest_dict = defaultdict(list)
+
         k = min(k, len(self.distances))
 
         # Find indices of k closest vertices
@@ -127,7 +132,7 @@ class ExtendedTrimesh(trimesh.Trimesh):
 
         # Store them in `k_closest_dict`
         for i in range(len(k_closest_idxs)):
-            self.k_closest_dict[k_closest_neigh_idxs[i]].add(k_closest_idxs[i])
+            self.k_closest_dict[k_closest_neigh_idxs[i]].append(k_closest_idxs[i])
 
 
     def threshold_vertices(
@@ -146,7 +151,9 @@ class ExtendedTrimesh(trimesh.Trimesh):
             The threshold under which vertices should be discarded.
         """
 
+        # Remove points whose distance is under the threshold
         under_threshold_mask = self.distances > threshold
+        self.distances = self.distances[under_threshold_mask]
         self.points = np.asarray(self.vertices)[under_threshold_mask]
         self.closest_neigh_idxs = self.closest_neigh_idxs[under_threshold_mask]
 
@@ -156,9 +163,7 @@ class ExtendedTrimesh(trimesh.Trimesh):
         self.mean_point_distance = np.mean(pc.compute_nearest_neighbor_distance())
 
         # Create `k_closest_dict` with remaining points
-        self.k_closest_dict = defaultdict(set)
         self.get_k_closest_vertices(self.k)
-        print(self.k_closest_dict)
 
 #-----------------------------------------------------------------------------------------------------------------
 
@@ -288,29 +293,36 @@ class OuterShell:
             # 2.b. Compute grid taking closest points extema on x and y
             max_x = np.max(closest_points[:, 0])
             min_x = np.min(closest_points[:, 0])
+            num_x = int((max_x - min_x) / grid_step)
             max_y = np.max(closest_points[:, 1])
             min_y = np.min(closest_points[:, 1])
-            x_grid = np.linspace(min_x, max_x, grid_step)
-            y_grid = np.linspace(min_y, max_y, grid_step)
+            num_y = int((max_y - min_y) / grid_step)
+            x_grid = np.linspace(min_x, max_x, num_x)
+            y_grid = np.linspace(min_y, max_y, num_y)
             X, Y = np.meshgrid(x_grid, y_grid)
+            X, Y = X.ravel(), Y.ravel()
 
             # 3. Predict on the newly created grid
             if method == "gp":
                 z_pred = model(np.column_stack(X, Y))
             elif method =="spline":
-                z_pred = bisplev(X, Y, model)
+                z_pred = bisplev(x_grid, y_grid, model)
             pred_points = np.column_stack(
-                [X.ravel(), Y.ravel(), z_pred.ravel()]
+                [X, Y, z_pred.ravel()]
             )
 
             # 4. Replace existing points in the grid with the newly fitted ones
-            mesh_1.points = np.remove(mesh_1.points, closest_point_idxs_1)
-            mesh_2.points = np.remove(mesh_2.points, closest_point_idxs_2)
+            remove_mask_1 = np.ones(len(mesh_1.points), dtype=bool)
+            remove_mask_1[closest_point_idxs_1] = False
+            mesh_1.points = mesh_1.points[remove_mask_1]
+            remove_mask_2 = np.ones(len(mesh_2.points), dtype=bool)
+            remove_mask_2[closest_point_idxs_2] = False
+            mesh_2.points = mesh_2.points[remove_mask_2]
             new_shell_points.append(
-                np.concatenate(mesh_1.points, mesh_2.points, pred_points)
+                np.concatenate([mesh_1.points, mesh_2.points, pred_points], axis=0)
             )
         
-        self.points = self.vstack(new_shell_points)
+        self.points = np.vstack(new_shell_points)
 
 
         
