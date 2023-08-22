@@ -4,7 +4,7 @@ import open3d as o3d
 import math
 from scipy.spatial import KDTree
 import sklearn.gaussian_process as gp
-from scipy.interpolate import bisplrep, bisplev
+from scipy.interpolate import bisplrep, bisplev, NearestNDInterpolator
 from collections import defaultdict
 from typing import List, Optional, Type, Literal
 
@@ -18,7 +18,7 @@ class ExtendedTrimesh(trimesh.Trimesh):
     def __init__(
             self, 
             neighbors: Optional[List[int]] = None,
-            k_percent: Optional[float] = 0.1,
+            k_percent: Optional[float] = 0.05,
             *args, **kwargs):
         """
         Initialize the ExtendedTrimesh object.
@@ -40,15 +40,16 @@ class ExtendedTrimesh(trimesh.Trimesh):
         # # Create a KDTree from the vertices of the mesh for quick spatial lookups.
         # self.kdtree = KDTree(np.asarray(self.vertices))  
         # Neighbors list
-        self.neighbors = neighbors if neighbors else None
+        self.neighbors = [int(neighbor) for neighbor in neighbors] if neighbors else None
         # Distance of each vertex to the closest mesh
         self.distances = np.full(len(self.vertices), np.inf)
         # Array storing for each vertex the index of the closest neighbors
         self.closest_neigh_idxs = np.zeros(len(self.vertices)) 
-        # K-closest dictionary -> associate to each neighbor index a list of vertices idxs that are within the k-closest 
-        # to any other mesh
+        # Dictionary that associate to each neighbor index a list of vertices idxs that are the k-closest to that neighbor
         self.k = int(k_percent * len(self.vertices))
-        self.k_closest_dict = defaultdict(list)
+        self.k_closest_dict = {}
+        # Dictionary that stores the KDTree for each subset of k-closest points
+        self.k_closest_kdtrees = {}
         # Array storing points to be included in the outer mesh (initialized as empty)
         self.points = []
         # Mean distance among each point and its nearest neighbor
@@ -105,34 +106,50 @@ class ExtendedTrimesh(trimesh.Trimesh):
     
     def get_k_closest_vertices(
             self,
-            k: int
+            k: int,
+            build_kdtrees: Optional[bool] = True
     ) -> None:
         """
-        Populate the `k_closest_dict` dictionary, storing a total of k closest vertex indexes associated
-        to the closest neighbor index.
+        First, populate `k_closest_dict`, storing, for each neighbor of `self`, the k closest vertex indexes of `self` to it.
+        Then, if required by the user, for each subset of k-closest points build a KDTree for efficient nearest neighbors search.
 
         Parameters:
         -----------
         k: (int)
             Number of closest vertices to consider.
+
+        build_kdtrees: (Optional[bool] = True)
+            If `True`, build a KDTree for each subset of k-closest points.
         """
 
         # Check if the dictionary is already populated
         if len(self.k_closest_dict) > 0:
             print("K-closest dic is not empty!")
-            self.k_closest_dict = defaultdict(list)
+            self.k_closest_dict = {}
 
-        k = min(k, len(self.distances))
+        assert k < len(self.distances), f"Cannot select a value for k ({k}) larger then total number of points {len(self.distances)}."
 
-        # Find indices of k closest vertices
-        k_closest_idxs = np.argpartition(self.distances, k)[:k]
+        for neigh_idx in self.neighbors:
+            original_idxs = np.arange(len(self.distances))
 
-        # Find indices of neighbors associated to k closest vertices
-        k_closest_neigh_idxs = self.closest_neigh_idxs[k_closest_idxs]
+            # Create a mask for the current neighbor, mask distances and original idxs            
+            neigh_idx_mask = self.closest_neigh_idxs == neigh_idx
+            masked_idxs = original_idxs[neigh_idx_mask]
+            masked_distances = self.distances[neigh_idx_mask]
 
-        # Store them in `k_closest_dict`
-        for i in range(len(k_closest_idxs)):
-            self.k_closest_dict[k_closest_neigh_idxs[i]].append(k_closest_idxs[i])
+            # Find indices of k closest vertices
+            k_closest_idxs = np.argpartition(masked_distances, k)[:k]
+
+            # Map back to original idxs
+            mapped_k_closest_idxs = masked_idxs[k_closest_idxs]
+
+            # Store them in `k_closest_dict`
+            self.k_closest_dict[neigh_idx] = mapped_k_closest_idxs
+            
+            # Build KDTree for the subset of points (if required)
+            if build_kdtrees:
+                k_closest_pts = self.points[mapped_k_closest_idxs]
+                self.k_closest_kdtrees[neigh_idx] = KDTree(np.asarray(k_closest_pts))  
 
 
     def threshold_vertices(
@@ -239,7 +256,7 @@ class OuterShell:
     
     def interpolate_gaps(
             self,
-            method: Literal['gp', 'spline'] = 'spline',
+            method: Literal['gp', 'spline', 'nearest'] = 'nearest',
             **kwargs
     ) -> None:
         """
@@ -265,6 +282,8 @@ class OuterShell:
             model.fit(np.column_stack(x, y), z)  
         elif method == "spline":
             model = bisplrep(x, y, z)
+        elif method =="nearest":
+            model = NearestNDInterpolator(np.column_stack([x, y]), z)
         else:
             NotImplementedError(f"Method {method} is not among the available ones.")
 
@@ -307,9 +326,10 @@ class OuterShell:
                 z_pred = model(np.column_stack(X, Y))
             elif method =="spline":
                 z_pred = bisplev(x_grid, y_grid, model)
-            pred_points = np.column_stack(
-                [X, Y, z_pred.ravel()]
-            )
+            elif model =="nearest":
+                z_pred = model(X, Y)
+            
+            pred_points = np.column_stack([X, Y, z_pred.ravel()])
 
             # 4. Replace existing points in the grid with the newly fitted ones
             remove_mask_1 = np.ones(len(mesh_1.points), dtype=bool)
