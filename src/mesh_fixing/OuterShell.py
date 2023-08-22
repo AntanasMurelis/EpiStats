@@ -310,7 +310,7 @@ class OuterShell:
     def interpolate_gaps(
             self,
             order: Literal['1', '2'] = '1',
-            num_samples_per_group: Optional[int] = 3,
+            n_samples: Optional[int] = 3,
     ) -> None:
         """
         Discarding points that are too close to another mesh may generate gaps in the outer shell point cloud.
@@ -328,9 +328,9 @@ class OuterShell:
         that join the pair. If `order=='2'`, triplets of points are considered and new points are sampled on the edges
         between points and on the mid-points of lines that connect points sampled on the edges.
         
-        num_samples_per_group: (Optional[int] = 3)
-            Number of point to sample for each group (i.e., pair or triplet of points). 
-        If `order=='2'`, the actual number of sampled points is `num_samples_per_group * 3`.
+        n_samples: (Optional[int] = 3)
+            Number of point to sample for each pair or triplet of points. 
+        If `order=='2'`, the actual number of sampled points is greater than n (see `sample_points_from_vertices`).
         """
 
         assert len(self.points) > 0, "Before interpolation you have to compute the point cloud for the shell."
@@ -366,21 +366,43 @@ class OuterShell:
             k_neighs = 1 if order == "1" else 2
             _, border_idxs_1 = closest_points_kdtree_1.query(border_points_2, k=k_neighs)
 
-            # 2.d. Store the pair of indices in tuples to avoid mixing up the pairs
-            border_idxs_pairs = [(b_idx1, b_idx2) for b_idx1, b_idx2 in zip(border_idxs_1, border_idxs_2)]
-            # Store in a set to remove duplicates
-            border_idxs_pairs = set(border_idxs_pairs)
-            # Get ordered border points for mesh 1
-            border_points_1 = closest_points_1[[pair[0] for pair in border_idxs_pairs]]
+            # 2.d. Extract pairs/triplets of closest points
+            if order == "1": 
+                border_idxs_pairs = [
+                    (b_idx1, b_idx2) for b_idx1, b_idx2 in zip(border_idxs_1, border_idxs_2)
+                ]
+                # Store in a set to remove duplicates
+                border_idxs_pairs = set(border_idxs_pairs)
+                # Get ordered border points for mesh 1 (shape is (N, 3))
+                border_points_1 = closest_points_1[[pair[0] for pair in border_idxs_pairs]]
+                # Append border points 2 to create pair of vertices for interpolation
+                points_for_interp = np.concatenate(
+                    border_points_1[:, np.newaxis, :],
+                    border_points_2[:, np.newaxis, :], 
+                    axis=1
+                )
+            elif order == "2": 
+                #in this case for each border point of 2, there is a pair of points from 1
+                border_idxs_triplets = [
+                    (b_idxs1[0], b_idxs1[1], b_idx2) 
+                    for b_idxs1, b_idx2 in zip(border_idxs_1, border_idxs_2)
+                ]
+                # Store in a set to remove duplicates
+                border_idxs_triplets = np.asarray(set(border_idxs_triplets))
+                # Get ordered border points for mesh 1 (shape is (N, 2, 3))
+                border_points_1 = closest_points_1[border_idxs_triplets[:, :2]]
+                # Append border points 2 to create pair of vertices for interpolation
+                points_for_interp = np.concatenate(
+                    border_points_1,
+                    border_points_2[:, np.newaxis, :], 
+                    axis=1
+                )
 
-            # 2.e. Compute the direction vectors for each pair of border points
-            direction_vectors = border_points_2 - border_points_1
-
-            # Sample points along the direction vectors
-            num_samples = 3
-            sampling_steps = np.linspace(0, 1, num_samples + 2)[1:-1, np.newaxis]
-            sampled_points = border_points_1[:, np.newaxis, :] +  sampling_steps * direction_vectors[:, np.newaxis, :]
-            sampled_points = sampled_points.reshape(-1, 3)
+            # 2.e. Sample points between points/vertices
+            sampled_points = sample_points_from_vertices(
+                vertices=points_for_interp,
+                num_samples=n_samples
+            )
             all_sampled_points.append(sampled_points)
 
         all_sampled_points = np.concatenate(all_sampled_points)
