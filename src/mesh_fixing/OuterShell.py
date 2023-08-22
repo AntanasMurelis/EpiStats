@@ -307,6 +307,7 @@ class OuterShell:
 
         self.points = np.vstack(shell_points)
 
+
     def interpolate_gaps(
             self,
             order: Literal['1', '2'] = '1',
@@ -345,11 +346,11 @@ class OuterShell:
         # 2. Iterate over the neighbor pairs
         all_sampled_points = []
         for idx_1, idx_2 in neighbor_pairs:
+            mesh_1, mesh_2 = self._meshes[idx_1], self._meshes[idx_2]
             assert len(mesh_1.k_closest_dict) > 0, f"Mesh {idx_1} has empty k_closest_dict attribute."
             assert len(mesh_2.k_closest_dict) > 0, f"Mesh {idx_2} has empty k_closest_dict attribute."
 
             # 2.a. Get closest points for each cell in the pair
-            mesh_1, mesh_2 = self._meshes[idx_1], self._meshes[idx_2]
             closest_point_idxs_1 = mesh_1.k_closest_dict[idx_2]
             closest_point_idxs_2 = mesh_2.k_closest_dict[idx_1]
             closest_points_1 = mesh_1.points[closest_point_idxs_1]
@@ -377,8 +378,7 @@ class OuterShell:
                 border_points_1 = closest_points_1[[pair[0] for pair in border_idxs_pairs]]
                 # Append border points 2 to create pair of vertices for interpolation
                 points_for_interp = np.concatenate(
-                    border_points_1[:, np.newaxis, :],
-                    border_points_2[:, np.newaxis, :], 
+                    [border_points_1[:, np.newaxis, :], border_points_2[:, np.newaxis, :]], 
                     axis=1
                 )
             elif order == "2": 
@@ -393,20 +393,19 @@ class OuterShell:
                 border_points_1 = closest_points_1[border_idxs_triplets[:, :2]]
                 # Append border points 2 to create pair of vertices for interpolation
                 points_for_interp = np.concatenate(
-                    border_points_1,
-                    border_points_2[:, np.newaxis, :], 
+                    [border_points_1, border_points_2[:, np.newaxis, :]], 
                     axis=1
                 )
 
             # 2.e. Sample points between points/vertices
-            sampled_points = sample_points_from_vertices(
-                vertices=points_for_interp,
-                num_samples=n_samples
-            )
-            all_sampled_points.append(sampled_points)
+            for pts in points_for_interp:
+                sampled_points = sample_points_from_vertices(
+                    vertices=pts,
+                    num_samples=n_samples
+                )
+                all_sampled_points.append(sampled_points)
 
-        all_sampled_points = np.concatenate(all_sampled_points)
-        self.points = np.vstack([self.points, all_sampled_points])
+        self.points = np.concatenate([self.points] + all_sampled_points, axis=0)
 
 
 
