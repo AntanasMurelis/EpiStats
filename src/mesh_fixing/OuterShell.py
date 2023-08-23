@@ -8,60 +8,6 @@ from scipy.interpolate import bisplrep, bisplev, NearestNDInterpolator
 from collections import defaultdict
 from typing import List, Optional, Type, Literal
 
-### UTILS ###
-#----------------------------------------------------------------------------------------------------------------------------
-def sample_points_from_vertices(
-        vertices: np.ndarray[float],
-        num_samples: int
-) -> np.ndarray[float]:
-    """
-    Given a pair or a triplet of vertices, sample `num_sample` new points.
-    If a pair of vertices is given, new points are sampled on the line that joins the vertices.
-    If a triplet of vertices is given, new points are sampled in the plane enclosed by the triangle
-    defined by the 3 vertices.
-
-    NOTE: In case vertices is a triplet, the number of sampled points is greater then `num_samples`.
-    (Math law is something like n**2 // 2 + n - 2 - 3)
-
-    Parameters:
-    -----------
-    vertices: (np.ndarray[float])
-        An array of shape (2, 3) or (3, 3), in case of, respectively, a pair or a triplet of vertices.
-    
-    num_samples: (np.ndarray[float])
-        The number of points to sample.
-    """
-    
-    assert vertices.shape[0] in (2, 3), "The shape of `vertices` must be either (2, 3) or (3, 3)"
-
-    sampled_points = []
-    
-    if vertices.shape[0] == 2:
-        v0, v1 = vertices
-
-        direction_vector = v1 - v0
-        sampling_steps = np.linspace(0, 1, num_samples + 2)[1:-1]
-        new_points = v0[np.newaxis, :] +  sampling_steps[:, np.newaxis] * direction_vector[np.newaxis, :]
-        sampled_points.append(new_points.reshape(-1, 3))
-
-    elif vertices.shape[0] == 3:
-        v0, v1, v2 = vertices
-
-        grid_points = np.linspace(0, 1, num_samples)
-        grid = np.array(np.meshgrid(grid_points, grid_points)).T.reshape(-1, 2)
-
-        for u, v in grid:
-            w = 1 - u - v
-            if 0 <= u < 1 and 0 <= v < 1 and 0 <= w < 1:
-                point = u * v0 + v * v1 + w * v2
-                sampled_points.append(point)
-
-        
-    sampled_points = np.vstack(sampled_points)
-    return sampled_points
-#----------------------------------------------------------------------------------------------------------------------------
-
-
 
 #----------------------------------------------------------------------------------------------------------------------------
 class ExtendedTrimesh(trimesh.Trimesh):
@@ -104,8 +50,10 @@ class ExtendedTrimesh(trimesh.Trimesh):
         self.k_closest_dict = {}
         # Dictionary that stores the KDTree for each subset of k-closest points
         self.k_closest_kdtrees = {}
-        # Array storing points to be included in the outer mesh (initialized as empty)
-        self.points = []
+        # Array storing filtered vertices used to generate the outer mesh (initialized as empty)
+        self.filtered_vertices = []
+        # Array storing the normals from the vertices used to generate the outer mesh (initialized as empty)
+        self.filtered_normals = []
         # Mean distance among each point and its nearest neighbor
         self.mean_point_distance = None
     
@@ -202,7 +150,7 @@ class ExtendedTrimesh(trimesh.Trimesh):
             
             # Build KDTree for the subset of points (if required)
             if build_kdtrees:
-                k_closest_pts = self.points[mapped_k_closest_idxs]
+                k_closest_pts = self.filtered_vertices[mapped_k_closest_idxs]
                 self.k_closest_kdtrees[neigh_idx] = KDTree(np.asarray(k_closest_pts))  
 
 
@@ -225,12 +173,13 @@ class ExtendedTrimesh(trimesh.Trimesh):
         # Remove points whose distance is under the threshold
         under_threshold_mask = self.distances > threshold
         self.distances = self.distances[under_threshold_mask]
-        self.points = np.asarray(self.vertices)[under_threshold_mask]
+        self.filtered_vertices = np.asarray(self.vertices)[under_threshold_mask]
+        self.filtered_normals = np.asarray(self.vertex_normals)[under_threshold_mask]
         self.closest_neigh_idxs = self.closest_neigh_idxs[under_threshold_mask]
 
-        # Compute mean distance among every point and its nearest neighbor
+        # Compute mean distance among every point and its one nearest neighbor
         pc = o3d.geometry.PointCloud()
-        pc.points = o3d.utility.Vector3dVector(self.points)
+        pc.points = o3d.utility.Vector3dVector(self.filtered_vertices)
         self.mean_point_distance = np.mean(pc.compute_nearest_neighbor_distance())
 
         # Create `k_closest_dict` with remaining points
@@ -270,8 +219,10 @@ class OuterShell:
         self._neighbors_lst = neighbors_lst if neighbors_lst else None
         # The length in microns of the shortest edge in the mesh (private)
         self._min_edge_length = min_edge_length if min_edge_length else None
-        # The array of points that should generate the outer shell mesh
+        # The array of points coordinates to generate the outer shell mesh from
         self.points = []
+        # The array of normals to the outer shell points
+        self.point_normals = []
         # The mean distance between each point and the nearest neighbor in the point cloud
         self.mean_point_distance = None
         # The final outer shell mesh
@@ -298,6 +249,7 @@ class OuterShell:
         """
 
         shell_points = []
+        shell_normals = []
         for i, (mesh, neighbors) in enumerate(zip(self._meshes, self._neighbors_lst)):
             assert isinstance(mesh, ExtendedTrimesh), "Current mesh is not an ExtendedTrimesh object."
 
@@ -305,9 +257,11 @@ class OuterShell:
             mesh.threshold_vertices(dist_threshold * self._min_edge_length)
             self._meshes[i] = mesh
 
-            shell_points.append(mesh.points)
+            shell_points.append(mesh.filtered_vertices)
+            shell_normals.append(mesh.filtered_normals)
 
         self.points = np.vstack(shell_points)
+        self.point_normals = np.vstack(shell_normals)
         self.mean_point_distance = np.mean([
             mesh.mean_point_distance for mesh in self._meshes
         ])
@@ -417,7 +371,8 @@ class OuterShell:
 
     def generate_mesh_from_point_cloud(
             self, 
-            algortihm: Literal["ball_pivoting", "poisson"] = "ball_pivoting",
+            algorithm: Literal["ball_pivoting", "poisson"] = "ball_pivoting",
+            estimate_normals: Optional[bool] = False,
             **kwargs
     ) -> None:
         """
@@ -430,10 +385,16 @@ class OuterShell:
             The algorithm employed for surface reconstruction. If "ball_pivoting", the Ball Pivoting 
             algorithm is used. If "poisson", the Screen Poisson Reconstruction algorithm is used instead.
 
+        estimate_normals: (Optional[bool] = False)
+            If `True`, normals are estimated from scratch from the point cloud using the function
+            `orient_normals_consistent_tangent_plane` from `open3d.geometry.PointCloud` with k=10
+            (http://www.open3d.org/docs/latest/python_api/open3d.geometry.PointCloud.html).
+            If `False`, the normals extracted from the thresholded vertices of the single meshes instead. 
+
         **kwargs:
             The parameters needed to tune the algorithms. If nothing is provided default values are used.
             
-        NOTE: about parameters for reconstruction algorithms:
+        NOTE1: about parameters for reconstruction algorithms:
         - Ball Pivoting: 
             1. "radius_factor": a multiplying factor for the average distance between nearest points
             (a proxy for the mean edge length) to get the radius of the ball in the algorithm. 
@@ -451,7 +412,7 @@ class OuterShell:
             positions of iso-vertices.
             (Default: False)
 
-        NOTE: the algorithms for mesh reconstruction are taken from `Open3D` python module.
+        NOTE2: the algorithms for mesh reconstruction are taken from `Open3D` python module.
         """ 
 
         assert len(self.points) > 0, "Before interpolation you have to compute a point cloud relative to the shell."
@@ -465,29 +426,88 @@ class OuterShell:
         # Estimate normals
         pcd = o3d.geometry.PointCloud()
         pcd.points = o3d.utility.Vector3dVector(self.points)
-        pcd.estimate_normals(fast_normal_computation=False)
-        pcd.orient_normals_consistent_tangent_plane(k=10)
+        if estimate_normals:
+            pcd.estimate_normals(fast_normal_computation=False)
+            pcd.orient_normals_consistent_tangent_plane(k=10)
+        else:
+            pcd.normals = o3d.utility.Vector3dVector(self.point_normals)
 
-        if algortihm == "ball_pivoting":
+        if algorithm == "ball_pivoting":
             radius = radius_factor * self.mean_point_distance 
             mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(
                     pcd, o3d.utility.DoubleVector([radius, radius * 2])
             )
-        elif algortihm == "poisson":
+        elif algorithm == "poisson":
             mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_poisson(
                 pcd, depth=depth, width=width, scale=scale, linear_fit=linear_fit
             )[0]  
         else:
-            ValueError(f"The algorithm {algortihm} is not available. Please choose one among ['ball_pivoting', 'poisson']")
+            ValueError(f"The algorithm {algorithm} is not available. Please choose one among ['ball_pivoting', 'poisson']")
 
         # create the triangular mesh with the vertices and faces from open3d
         self.mesh = trimesh.Trimesh(
             np.asarray(mesh.vertices), np.asarray(mesh.triangles),
             vertex_normals=np.asarray(mesh.vertex_normals)
         )
-                
+
+    
+    # def generate_outer_shell(
+    #        self,  
+    # )
 
 
+### UTILS ###
+#----------------------------------------------------------------------------------------------------------------------------
+def sample_points_from_vertices(
+        vertices: np.ndarray[float],
+        num_samples: int
+) -> np.ndarray[float]:
+    """
+    Given a pair or a triplet of vertices, sample `num_sample` new points.
+    If a pair of vertices is given, new points are sampled on the line that joins the vertices.
+    If a triplet of vertices is given, new points are sampled in the plane enclosed by the triangle
+    defined by the 3 vertices.
+
+    NOTE: In case vertices is a triplet, the number of sampled points is greater then `num_samples`.
+    (Math law is something like n**2 // 2 + n - 5)
+
+    Parameters:
+    -----------
+    vertices: (np.ndarray[float])
+        An array of shape (2, 3) or (3, 3), in case of, respectively, a pair or a triplet of vertices.
+    
+    num_samples: (np.ndarray[float])
+        The number of points to sample.
+    """
+    
+    assert vertices.shape[0] in (2, 3), "The shape of `vertices` must be either (2, 3) or (3, 3)"
+
+    sampled_points = []
+    
+    if vertices.shape[0] == 2:
+        v0, v1 = vertices
+
+        direction_vector = v1 - v0
+        sampling_steps = np.linspace(0, 1, num_samples + 2)[1:-1]
+        new_points = v0[np.newaxis, :] +  sampling_steps[:, np.newaxis] * direction_vector[np.newaxis, :]
+        sampled_points.append(new_points.reshape(-1, 3))
+
+    elif vertices.shape[0] == 3:
+        v0, v1, v2 = vertices
+
+        grid_points = np.linspace(0, 1, num_samples)
+        grid = np.array(np.meshgrid(grid_points, grid_points)).T.reshape(-1, 2)
+
+        for u, v in grid:
+            w = 1 - u - v
+            if 0 <= u < 1 and 0 <= v < 1 and 0 <= w < 1:
+                point = u * v0 + v * v1 + w * v2
+                sampled_points.append(point)
+
+        
+    sampled_points = np.vstack(sampled_points)
+    return sampled_points
+#----------------------------------------------------------------------------------------------------------------------------
 
 
 
