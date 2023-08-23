@@ -56,9 +56,13 @@ class ExtendedTrimesh(trimesh.Trimesh):
         self.filtered_vertices = []
         # Array storing the normals from the vertices used to generate the outer mesh (initialized as empty)
         self.filtered_normals = []
-        # Mean distance among each point and its nearest neighbor
-        self.mean_point_distance = None
-    
+        # Mean distance between a point and its nearest neighbor
+        self.avg_point_distance = None
+        # Minimum distance between a point and its nearest neighbor
+        pc = o3d.geometry.PointCloud()
+        pc.points = o3d.utility.Vector3dVector(self.vertices)
+        self.min_point_distance = np.mean(pc.compute_nearest_neighbor_distance())
+        
 
     def _get_dist(
             self,
@@ -182,7 +186,7 @@ class ExtendedTrimesh(trimesh.Trimesh):
         # Compute mean distance among every point and its one nearest neighbor
         pc = o3d.geometry.PointCloud()
         pc.points = o3d.utility.Vector3dVector(self.filtered_vertices)
-        self.mean_point_distance = np.mean(pc.compute_nearest_neighbor_distance())
+        self.avg_point_distance = np.mean(pc.compute_nearest_neighbor_distance())
 
         # Create `k_closest_dict` with remaining points
         self.get_k_closest_vertices(self.k)
@@ -212,25 +216,23 @@ class OuterShell:
             A list of ExtendedTrimesh objects that are meant to build the outer shell. 
         neighbors_lst: (List[List[int]])
             A list of neighbors associated to each mesh in meshes
-        min_edge_length: (float)
-            The length in microns of the shortest edge in the target mesh
         """
         # The list of meshes contained in the shell (private)
         self._meshes = meshes if meshes else None
         # The list of neighbors associated to each mesh in meshes (private)
         self._neighbors_lst = neighbors_lst if neighbors_lst else None
         # The length in microns of the shortest edge in the mesh (private)
-        self._min_edge_length = min_edge_length if min_edge_length else None
+        self._min_edge_length = np.mean([mesh.min_edge_length for mesh in self._meshes])
+        # The mean distance between each point and the nearest neighbor in the point cloud
+        self._mean_point_distance = None
         # The array of points coordinates to generate the outer shell mesh from
         self.points = []
         # The array of normals to the outer shell points
         self.point_normals = []
-        # The mean distance between each point and the nearest neighbor in the point cloud
-        self.mean_point_distance = None
         # The final outer shell mesh
         self.mesh = None
-
     
+
     def get_shell_point_cloud(
             self,
             dist_threshold: float
@@ -265,7 +267,7 @@ class OuterShell:
         self.points = np.vstack(shell_points)
         self.point_normals = np.vstack(shell_normals)
         self.mean_point_distance = np.mean([
-            mesh.mean_point_distance for mesh in self._meshes
+            mesh.avg_point_distance for mesh in self._meshes
         ])
 
 
@@ -542,12 +544,14 @@ class OuterShell:
             meshes involved is large. Therefore, overwriting might be something undesirable.
         """
 
-        assert os.path.isfile(path_to_file) and overwrite, f"Aborting export since a file was at {path_to_file} and overwrite is set to {overwrite}"
+        assert not os.path.exists(path_to_file) and not overwrite, (
+            f"Aborting export since a file was found at {path_to_file} and overwrite is set to {overwrite}"
+        )
 
         file_extension = os.path.basename(path_to_file).split(".")[-1]
         assert file_extension == "stl", f"Cannot export '.{file_extension}' file. The only supported format is '.stl'."
 
-        path_to_dir = os.path.dirname(path_to_dir)
+        path_to_dir = os.path.dirname(path_to_file)
 
         if not os.path.exists(path_to_dir):
             os.makedirs(path_to_dir)
