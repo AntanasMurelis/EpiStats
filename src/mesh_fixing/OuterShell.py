@@ -1,3 +1,4 @@
+import os
 import trimesh
 import numpy as np
 import open3d as o3d
@@ -417,8 +418,7 @@ class OuterShell:
         """ 
 
         assert len(self.points) > 0, "Before interpolation you have to compute a point cloud relative to the shell."
-        assert (
-            algorithm in ['ball_pivoting', 'poisson'], 
+        assert (algorithm in ['ball_pivoting', 'poisson']), ( 
             f"The algorithm {algorithm} is not available. Please choose one among ['ball_pivoting', 'poisson']"
         )
 
@@ -521,6 +521,38 @@ class OuterShell:
             estimate_normals=estimate_vertex_normals,
             **reconstruction_params
         )
+
+    def mesh_to_file(
+            self,
+            path_to_file: str,
+            overwrite: Optional[bool] = False
+    ) -> None:
+        """
+        Save mesh to a file.
+
+        Parameters:
+        -----------
+        path_to_file: (str)
+            The path to the file where to save the mesh. 
+            The only supported format is '.stl'.
+
+        overwrite: (Optional[bool] = False)
+            If `True` and a file already exists at the specified path, that file is overwritten.
+            Notice that generating the outer shell could be a time consuming process when the number of 
+            meshes involved is large. Therefore, overwriting might be something undesirable.
+        """
+
+        assert os.path.isfile(path_to_file) and overwrite, f"Aborting export since a file was at {path_to_file} and overwrite is set to {overwrite}"
+
+        file_extension = os.path.basename(path_to_file).split(".")[-1]
+        assert file_extension == "stl", f"Cannot export '.{file_extension}' file. The only supported format is '.stl'."
+
+        path_to_dir = os.path.dirname(path_to_dir)
+
+        if not os.path.exists(path_to_dir):
+            os.makedirs(path_to_dir)
+
+        self.mesh.export(path_to_file)
 
 
 
