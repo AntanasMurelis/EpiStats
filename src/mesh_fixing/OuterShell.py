@@ -2,11 +2,12 @@ import trimesh
 import numpy as np
 import open3d as o3d
 import math
+from tqdm import tqdm
 from scipy.spatial import KDTree
 import sklearn.gaussian_process as gp
 from scipy.interpolate import bisplrep, bisplev, NearestNDInterpolator
 from collections import defaultdict
-from typing import List, Optional, Type, Literal
+from typing import List, Optional, Type, Literal, Dict
 
 
 #----------------------------------------------------------------------------------------------------------------------------
@@ -416,6 +417,10 @@ class OuterShell:
         """ 
 
         assert len(self.points) > 0, "Before interpolation you have to compute a point cloud relative to the shell."
+        assert (
+            algorithm in ['ball_pivoting', 'poisson'], 
+            f"The algorithm {algorithm} is not available. Please choose one among ['ball_pivoting', 'poisson']"
+        )
 
         radius_factor = kwargs["radius_factor"] if "radius_factor" in kwargs else 1.5
         depth = kwargs["depth"] if "depth" in kwargs else 8
@@ -441,8 +446,6 @@ class OuterShell:
             mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_poisson(
                 pcd, depth=depth, width=width, scale=scale, linear_fit=linear_fit
             )[0]  
-        else:
-            ValueError(f"The algorithm {algorithm} is not available. Please choose one among ['ball_pivoting', 'poisson']")
 
         # create the triangular mesh with the vertices and faces from open3d
         self.mesh = trimesh.Trimesh(
@@ -451,9 +454,76 @@ class OuterShell:
         )
 
     
-    # def generate_outer_shell(
-    #        self,  
-    # )
+    def generate_outer_shell(
+           self,
+           threshold_distance: Optional[float] =  10,
+           reconstruction_algorithm: Literal['ball_pivoting', 'poisson'] = 'poisson',
+           reconstruction_params: Optional[Dict[str, float]] = {},
+           estimate_vertex_normals: Optional[bool] = False,
+           interpolate_gaps: Optional[bool] = False
+    ) -> None:
+        """
+        Wrapper for all the function needed to generate the outer shell, from point thresholding,
+        to mesh generation from point cloud.
+
+        Parameters:
+        -----------
+        threshold_distance: (Optional[float] =  10)
+            The distance threshold under which vertices are discarded. For simplicity it is expressed in units
+            of `min_edge_length`.
+        reconstruction_algorithm: (Literal['ball_pivoting', 'poisson'] = 'poisson')
+            The algorithm employed for surface reconstruction. If "ball_pivoting", the Ball Pivoting 
+            algorithm is used. If "poisson", the Screen Poisson Reconstruction algorithm is used instead.
+            For a better result Poisson algorithm should be preferred.
+        reconstruction_params: (Optional[Dict[str, float]] = {})
+            The parameters needed to tune the algorithms. If nothing is provided default values are used.
+        estimate_vertex_normals: (Optional[bool] = False)
+            If `True`, normals are estimated from scratch from the point cloud using the function
+            `orient_normals_consistent_tangent_plane` from `open3d.geometry.PointCloud` with k=10
+            (http://www.open3d.org/docs/latest/python_api/open3d.geometry.PointCloud.html).
+            If `False`, the normals extracted from the thresholded vertices of the single meshes instead. 
+        interpolate_gaps: (Optional[bool] = False)
+            Discarding points that are too close to another mesh may generate gaps in the outer shell point cloud.
+            If `True`, place points in those gaps by computing the border points for each pair of neighbors
+            (i.e., subsets of points that are reciprocally the closest), and interpolating points between groups of 
+            such points. 
+        
+        NOTE: about interpolation and reconstruction algorithms:
+        Interpolation places points in the gaps and hence it is helpful in case the chosen algorithm for surface 
+        recontruction is ball pivoting. However, the algorithm for interpolating the gaps is far from being perfect
+        and hence should be used carefully.
+        The suggestion is to always try to use first the Screened Poisson Reconstruction algorithm.
+
+
+        NOTE: about parameters for reconstruction algorithms:
+        - Ball Pivoting: 
+            1. "radius_factor": a multiplying factor for the average distance between nearest points
+            (a proxy for the mean edge length) to get the radius of the ball in the algorithm. 
+            (Default: 1.5)
+        - Screened Poisson Reconstruction: 
+            1. "depth": the tree-depth used for the reconstruction. The higher the more detailed the mesh.
+            (Default: 8)
+            2. "width": the target width of the finest level of the octree. This parameter is ignored if 
+            the depth is specified.
+            (Default: 0)
+            3. "scale": the ratio between the diameter of the cube used for reconstruction and the diameter 
+            of the samples' bounding cube. Often the default value works well enough.
+            (Default: 1.1)
+            4. "linear_fit": if set to true, let the reconstructor use linear interpolation to estimate the
+            positions of iso-vertices.
+            (Default: False)
+        """
+
+        self.get_shell_point_cloud(dist_threshold=threshold_distance)
+
+        self.generate_mesh_from_point_cloud(
+            algorithm=reconstruction_algorithm,
+            estimate_normals=estimate_vertex_normals,
+            **reconstruction_params
+        )
+
+
+
 
 
 ### UTILS ###
