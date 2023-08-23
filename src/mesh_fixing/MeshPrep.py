@@ -11,7 +11,7 @@ from napari_process_points_and_surfaces import label_to_surface
 from tqdm import tqdm
 from collections import Counter
 from itertools import combinations
-from typing import Union, List, Tuple, Optional
+from typing import Union, List, Tuple, Optional, Literal
 from skimage import io
 from scipy.ndimage import binary_dilation, binary_closing
 """Script for remeshing and preparing meshes for the SimuCell3D."""
@@ -724,100 +724,6 @@ def convert_cell_labels_to_meshes(
 
 
 
-
-#---------------------------------------------------------------------------------------------------------------
-def create_outer_shell_mesh(
-        meshes: List[trimesh.Trimesh],
-        neighbors: List[List[int]],
-        dist_threshold: float,
-        translation: float,
-) -> trimesh.Trimesh:
-    """
-    Given a list of cell meshes and cell neighbors, create a tight outer shell mesh that contains all the cells.
-
-    ALGORITHM
-    - For each mesh 
-        - Store its vertices as an array of 3D coordinates
-        - For each neighboring mesh:
-            - Compute the distance between the neighboring mesh and all the vertices.
-            - Compare distances for this neighbor and the distance threshold and remove
-              from the vertices list all the vertices whose distance is lower than the threshold
-        - Add the remaining vertices to the list of vertices that will compose the outer shell
-
-    Parameters:
-    -----------
-    meshes: (List[trimesh.Trimesh])
-        A list of meshes in the trimesh format associated to the single cells in the sample.
-
-    neighbors: (List[List[int]])
-        A list whose elements are list of neigbors for each cell
-
-    dist_threshold: (float)
-        The threshold distance under which a vertex is discarded, and hence not used to create the outer shell.
-    
-    translation: (float)
-        The extent of the translation (in microns) to apply to the points of the outer shell, to make sure that 
-        all the cells are well included in the shell.
-
-    Returns:
-    --------
-    outer_shell_mesh: (trimesh.Trimesh)
-        The mesh associated to the outer shell
-    """
-
-    # N.B. Make sure that meshes and neighbors are aligned (i.e. they are ordered and each pair of values
-    # is associated to the same cell id)
-
-    shell_points = []
-
-    for mesh, neigh_idxs in zip(meshes, neighbors):
-        print("---------------------------------------------------")
-        print(f"Current mesh: {mesh}, curr neighbors: {neigh_idxs}")
-        curr_vertices = np.asarray(mesh.vertices)
-        print(f"Original num of vertices: {curr_vertices.shape}")
-        for neigh_idx in neigh_idxs:
-            distances = - signed_distance(meshes[neigh_idx], curr_vertices)
-            print(f"Max distance: {max(distances)}, mean: {np.mean(distances)}, std: {np.std(distances)}")
-            mask = distances > dist_threshold
-            curr_vertices = curr_vertices[mask, :]
-            print(f"Remaining num of vertices: {curr_vertices.shape}")
-        shell_points.append(curr_vertices)
-
-    # Create mesh from points
-    shell_points = np.concatenate(shell_points)
-    shell_cloud = o3d.geometry.PointCloud()
-    shell_cloud.points = o3d.utility.Vector3dVector(shell_points)
-    shell_cloud.estimate_normals()
-
-    # estimate radius for rolling ball
-    distances = shell_cloud.compute_nearest_neighbor_distance()
-    avg_dist = np.mean(distances)
-    radius = 1.5 * avg_dist   
-
-    # Create mesh in open3d
-    shell_mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(
-        shell_cloud,
-        o3d.utility.DoubleVector([radius, radius * 2])
-    )
-
-    # convert mesh to trimesh
-    shell_mesh = trimesh.Trimesh(
-        np.asarray(shell_mesh.vertices), 
-        np.asarray(shell_mesh.triangles),
-        vertex_normals=np.asarray(shell_mesh.vertex_normals)
-    )
-
-    # Translate points and remesh
-    displacements = translation * shell_mesh.vertex_normals
-    shell_mesh.vertices += displacements
-    shell_mesh = trimesh.convex.convex_hull(shell_mesh.vertices)
-
-    return shell_mesh, shell_cloud, shell_points
-#---------------------------------------------------------------------------------------------------------------
-
-
-
-
 #---------------------------------------------------------------------------------------------------------------
 def create_and_export_meshes(
         cell_labels: list, 
@@ -825,6 +731,7 @@ def create_and_export_meshes(
         output_dir: str,
         voxel_resolution: np.ndarray, 
         make_shell: bool = True, 
+        shell_type: Literal["voxel", "mesh"] = "mesh",
         smoothing_iterations: int = 10,
         dilation_iter: int = 3, 
         closing_iter: int = 2
