@@ -5,9 +5,6 @@ import open3d as o3d
 import math
 from tqdm import tqdm
 from scipy.spatial import KDTree
-import sklearn.gaussian_process as gp
-from scipy.interpolate import bisplrep, bisplev, NearestNDInterpolator
-from collections import defaultdict
 from typing import List, Optional, Type, Literal, Dict
 
 
@@ -27,6 +24,7 @@ class ExtendedTrimesh(trimesh.Trimesh):
         
         Parameters:
         -----------
+
         neighbors: (Optional[List[int]] = None)
             A list of neighbors of this mesh
 
@@ -73,6 +71,7 @@ class ExtendedTrimesh(trimesh.Trimesh):
 
         Parameters:
         -----------
+
         other: (ExtendedTrimesh)
             A mesh object of `ExtendedTrimesh` class
         
@@ -101,6 +100,7 @@ class ExtendedTrimesh(trimesh.Trimesh):
 
         Parameters:
         -----------
+
         neigh_meshes: (List[Type['ExtendedTrimesh']])
             A list of ExtendedTrimesh objects representing the neighboring meshes.
         """
@@ -123,6 +123,7 @@ class ExtendedTrimesh(trimesh.Trimesh):
 
         Parameters:
         -----------
+
         k: (int)
             Number of closest vertices to consider.
 
@@ -169,6 +170,7 @@ class ExtendedTrimesh(trimesh.Trimesh):
 
         Parameters:
         -----------
+
         mesh: (ExtendedTrimesh)
             An ExtendedTrimesh object to apply thresholding on.
         
@@ -222,7 +224,7 @@ class OuterShell:
         # The list of neighbors associated to each mesh in meshes (private)
         self._neighbors_lst = neighbors_lst if neighbors_lst else None
         # The length in microns of the shortest edge in the mesh (private)
-        self._min_edge_length = np.mean([mesh.min_edge_length for mesh in self._meshes])
+        self.min_edge_length = np.mean([mesh.min_edge_length for mesh in self._meshes])
         # The mean distance between each point and the nearest neighbor in the point cloud
         self._mean_point_distance = None
         # The array of points coordinates to generate the outer shell mesh from
@@ -247,6 +249,7 @@ class OuterShell:
 
         Parameters:
         -----------
+
         dist_threshold: (float)
             The distance threshold under which vertices are discarded. For simplicity it is expressed in units
             of `min_edge_length`.
@@ -258,7 +261,7 @@ class OuterShell:
             assert isinstance(mesh, ExtendedTrimesh), "Current mesh is not an ExtendedTrimesh object."
 
             mesh.compute_min_distances([self._meshes[neighbor] for neighbor in neighbors])
-            mesh.threshold_vertices(dist_threshold * self._min_edge_length)
+            mesh.threshold_vertices(dist_threshold * self.min_edge_length)
             self._meshes[i] = mesh
 
             shell_points.append(mesh.filtered_vertices)
@@ -287,6 +290,7 @@ class OuterShell:
 
         Parameters:
         -----------
+
         order: (Literal['1', '2'])
             If `order=='1'`, pairs of border points are considered and new points are sampled on the lines
         that join the pair. If `order=='2'`, triplets of points are considered and new points are sampled on the edges
@@ -373,6 +377,51 @@ class OuterShell:
         self.points = np.concatenate([self.points] + all_sampled_points, axis=0)
     
 
+
+    def estimate_point_normals(
+        self,
+        num_nearest_neighbors: Optional[int] = 10
+    ) -> None:
+        """
+        Estimate normal vectors to the points in the shell point cloud using the function
+        `orient_normals_consistent_tangent_plane` from `open3d.geometry.PointCloud`
+        (http://www.open3d.org/docs/latest/python_api/open3d.geometry.PointCloud.html).
+
+        Parameters:
+        -----------
+
+        num_nearest_neighbors: (Optional[int] = 10)
+            The number of nearest neighbors used in constructing the Riemannian graph used to 
+            propagate normal orientation.
+        """
+
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = o3d.utility.Vector3dVector(self.points)
+        pcd.estimate_normals(fast_normal_computation=False)
+        pcd.orient_normals_consistent_tangent_plane(k=num_nearest_neighbors)
+        self.point_normals = np.asarray(pcd.normals)
+
+
+    def displace_point_cloud(
+        self,
+        num_min_edge_length: Optional[int] = 1
+    ) -> None:
+        """
+        Make sure the the outer mesh contains all the meshes by displacing the shell points 
+        along their normals. The translation extent should be really small not to leave big gaps.
+
+        Parameters:
+        -----------
+
+        num_min_edge_length: (Optional[int] = 1)
+            The translation extent is computed as (num_min_edge_length * self.min_edge_length)
+        """
+
+        translation = num_min_edge_length * self.min_edge_length
+        displacements = translation * self.point_normals
+        self.points += displacements
+
+
     def generate_mesh_from_point_cloud(
             self, 
             algorithm: Literal["ball_pivoting", "poisson"] = "ball_pivoting",
@@ -385,6 +434,7 @@ class OuterShell:
 
         Parameters:
         -----------
+
         algorithm: (Literal["ball_pivoting", "poisson"] = "poisson")
             The algorithm employed for surface reconstruction. If "ball_pivoting", the Ball Pivoting 
             algorithm is used. If "poisson", the Screen Poisson Reconstruction algorithm is used instead.
@@ -430,14 +480,11 @@ class OuterShell:
         scale = kwargs["scale"] if "scale" in kwargs else 1.1
         linear_fit = kwargs["linear_fit"] if "linear_fit" in kwargs else False
 
-        # Estimate normals
+        if estimate_normals:
+            self.estimate_point_normals()
         pcd = o3d.geometry.PointCloud()
         pcd.points = o3d.utility.Vector3dVector(self.points)
-        if estimate_normals:
-            pcd.estimate_normals(fast_normal_computation=False)
-            pcd.orient_normals_consistent_tangent_plane(k=10)
-        else:
-            pcd.normals = o3d.utility.Vector3dVector(self.point_normals)
+        pcd.normals = o3d.utility.Vector3dVector(self.point_normals)
 
         if algorithm == "ball_pivoting":
             radius = radius_factor * self.mean_point_distance 
@@ -449,7 +496,6 @@ class OuterShell:
                 pcd, depth=depth, width=width, scale=scale, linear_fit=linear_fit
             )[0]  
 
-        # create the triangular mesh with the vertices and faces from open3d
         self.mesh = trimesh.Trimesh(
             np.asarray(mesh.vertices), np.asarray(mesh.triangles),
             vertex_normals=np.asarray(mesh.vertex_normals)
@@ -457,12 +503,15 @@ class OuterShell:
 
     
     def generate_outer_shell(
-           self,
-           threshold_distance: Optional[float] =  10,
-           reconstruction_algorithm: Literal['ball_pivoting', 'poisson'] = 'poisson',
-           reconstruction_params: Optional[Dict[str, float]] = {},
-           estimate_vertex_normals: Optional[bool] = False,
-           interpolate_gaps: Optional[bool] = False
+        self,
+        threshold_distance: Optional[float] =  10,
+        interp_gaps: Optional[bool] = False,
+        interp_params: Optional[Dict[str, any]] = {},
+        estimate_vertex_normals: Optional[bool] = False,
+        displace_points: Optional[bool] = False,
+        displace_params: Optional[Dict[str, int]] = {},
+        reconstruction_algorithm: Literal['ball_pivoting', 'poisson'] = 'poisson',
+        reconstruction_params: Optional[Dict[str, float]] = {},
     ) -> None:
         """
         Wrapper for all the function needed to generate the outer shell, from point thresholding,
@@ -470,25 +519,33 @@ class OuterShell:
 
         Parameters:
         -----------
+
         threshold_distance: (Optional[float] =  10)
             The distance threshold under which vertices are discarded. For simplicity it is expressed in units
             of `min_edge_length`.
+        interp_gaps: (Optional[bool] = False)
+            Discarding points that are too close to another mesh may generate gaps in the outer shell point cloud.
+            If `True`, place points in those gaps by computing the border points for each pair of neighbors
+            (i.e., subsets of points that are reciprocally the closest), and interpolating points between groups of 
+            such points. 
+        interp_params: (Optional[Dict[str, any]] = {})
+            Dictionary of parameters used for interpolation. Check `interpolate_gaps` method for more information.
+        estimate_vertex_normals: (Optional[bool] = False)
+            If `True`, normals are estimated from scratch from the point cloud using the function
+            `orient_normals_consistent_tangent_plane` from `open3d.geometry.PointCloud` with k=10
+            (http://www.open3d.org/docs/latest/python_api/open3d.geometry.PointCloud.html).
+            If `False`, the normals extracted from the thresholded vertices of the single meshes instead. 
+        displace_points: (Optional[bool] = False)
+            Make sure the the outer mesh contains all the meshes by displacing the shell points 
+            along their normals.
+        displace_params: (Optional[Dict[str, int]] = {})
+            Dictionary of parameters used for point displacement. Check `displace_point_cloud` method for more information.
         reconstruction_algorithm: (Literal['ball_pivoting', 'poisson'] = 'poisson')
             The algorithm employed for surface reconstruction. If "ball_pivoting", the Ball Pivoting 
             algorithm is used. If "poisson", the Screen Poisson Reconstruction algorithm is used instead.
             For a better result Poisson algorithm should be preferred.
         reconstruction_params: (Optional[Dict[str, float]] = {})
             The parameters needed to tune the algorithms. If nothing is provided default values are used.
-        estimate_vertex_normals: (Optional[bool] = False)
-            If `True`, normals are estimated from scratch from the point cloud using the function
-            `orient_normals_consistent_tangent_plane` from `open3d.geometry.PointCloud` with k=10
-            (http://www.open3d.org/docs/latest/python_api/open3d.geometry.PointCloud.html).
-            If `False`, the normals extracted from the thresholded vertices of the single meshes instead. 
-        interpolate_gaps: (Optional[bool] = False)
-            Discarding points that are too close to another mesh may generate gaps in the outer shell point cloud.
-            If `True`, place points in those gaps by computing the border points for each pair of neighbors
-            (i.e., subsets of points that are reciprocally the closest), and interpolating points between groups of 
-            such points. 
         
         NOTE: about interpolation and reconstruction algorithms:
         Interpolation places points in the gaps and hence it is helpful in case the chosen algorithm for surface 
@@ -518,6 +575,12 @@ class OuterShell:
 
         self.get_shell_point_cloud(dist_threshold=threshold_distance)
 
+        if interp_gaps:
+            self.interpolate_gaps(**interp_params)
+
+        if displace_points:
+            self.displace_point_cloud(**displace_params)
+
         self.generate_mesh_from_point_cloud(
             algorithm=reconstruction_algorithm,
             estimate_normals=estimate_vertex_normals,
@@ -534,6 +597,7 @@ class OuterShell:
 
         Parameters:
         -----------
+
         path_to_file: (str)
             The path to the file where to save the mesh. 
             The only supported format is '.stl'.
@@ -579,6 +643,7 @@ def sample_points_from_vertices(
 
     Parameters:
     -----------
+
     vertices: (np.ndarray[float])
         An array of shape (2, 3) or (3, 3), in case of, respectively, a pair or a triplet of vertices.
     
