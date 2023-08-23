@@ -76,6 +76,37 @@ def copy_selected_meshes(
 #---------------------------------------------------------------------------------------------------------------------
 
 
+
+#---------------------------------------------------------------------------------------------------------------------
+def get_cell_neighbors(
+        path_to_stats_df: str,
+        cell_ids: List[int]
+) -> List[List[int]]:
+    """
+    Load the dataframe of cell statistics and, for each cell in cell_ids, extract its neighbors' ids list.
+
+    Parameters:
+    -----------
+    path_to_stats_df: (str)
+        The path to the statistics dataframe.
+    
+    cell_ids: (List[int])
+        A list of cell ids.
+
+    Returns:
+    --------
+    cell_neighbors_lst: (List[List[int]])
+        A list of neighbors' ids for each cell.
+    """
+
+    cell_stats_df = prepare_df([path_to_stats_df])
+    cell_neighbors_lst = cell_stats_df["cell_ID" in cell_ids]["neigbors"].tolist()
+
+    return cell_neighbors_lst
+#---------------------------------------------------------------------------------------------------------------------
+
+
+
 if __name__ == "__main__":
     
     ### SET PATHS ###
