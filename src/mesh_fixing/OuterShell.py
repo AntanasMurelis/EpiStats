@@ -270,9 +270,11 @@ class OuterShell:
         self._neighbors_lst = neighbors_lst if neighbors_lst else None
         # The length in microns of the shortest edge in the mesh (private)
         self._min_edge_length = min_edge_length if min_edge_length else None
-        # Attribute meant to store the array of points that should generate the outer shell mesh
+        # The array of points that should generate the outer shell mesh
         self.points = []
-        # Attribute meant to store the final outer shell mesh
+        # The mean distance between each point and the nearest neighbor in the point cloud
+        self.mean_point_distance = None
+        # The final outer shell mesh
         self.mesh = None
 
     
@@ -306,6 +308,9 @@ class OuterShell:
             shell_points.append(mesh.points)
 
         self.points = np.vstack(shell_points)
+        self.mean_point_distance = np.mean([
+            mesh.mean_point_distance for mesh in self._meshes
+        ])
 
 
     def interpolate_gaps(
@@ -370,10 +375,11 @@ class OuterShell:
             # 2.d. Extract pairs/triplets of closest points
             if order == "1": 
                 border_idxs_pairs = [
-                    (b_idx1, b_idx2) for b_idx1, b_idx2 in zip(border_idxs_1, border_idxs_2)
+                    (b_idx1, b_idx2) 
+                    for b_idx1, b_idx2 in zip(border_idxs_1, border_idxs_2)
                 ]
-                # Store in a set to remove duplicates
-                border_idxs_pairs = set(border_idxs_pairs)
+                # # Store in a set to remove duplicates
+                # border_idxs_pairs = set(border_idxs_pairs)
                 # Get ordered border points for mesh 1 (shape is (N, 3))
                 border_points_1 = closest_points_1[[pair[0] for pair in border_idxs_pairs]]
                 # Append border points 2 to create pair of vertices for interpolation
@@ -387,8 +393,9 @@ class OuterShell:
                     (b_idxs1[0], b_idxs1[1], b_idx2) 
                     for b_idxs1, b_idx2 in zip(border_idxs_1, border_idxs_2)
                 ]
-                # Store in a set to remove duplicates
-                border_idxs_triplets = np.asarray(set(border_idxs_triplets))
+                # # Store in a set to remove duplicates
+                # border_idxs_triplets = np.asarray(set(border_idxs_triplets))
+                border_idxs_triplets = np.asarray(border_idxs_triplets)
                 # Get ordered border points for mesh 1 (shape is (N, 2, 3))
                 border_points_1 = closest_points_1[border_idxs_triplets[:, :2]]
                 # Append border points 2 to create pair of vertices for interpolation
@@ -406,6 +413,60 @@ class OuterShell:
                 all_sampled_points.append(sampled_points)
 
         self.points = np.concatenate([self.points] + all_sampled_points, axis=0)
+    
+
+    def generate_mesh_from_point_cloud(
+            self, 
+            algortihm: Literal["ball_pivoting", "poisson"] = "ball_pivoting",
+            **kwargs
+    ) -> None:
+        """
+        Generate a surface mesh from the point cloud using one of the available algorithms, namely
+        Ball Pivoting, or Screened Poisson Reconstruction.
+
+        NOTE: the algorithm for mesh reconstruction are taken from `Open3D` python module.
+
+        Parameters:
+        -----------
+        algorithm: (Literal["ball_pivoting", "poisson"] = "ball_pivoting")
+            The algorithm employed for surface reconstruction. If "ball_pivoting", the Ball Pivoting 
+            algorithm is used. If "poisson", the Screen Poisson Reconstruction algorithm is used instead.
+
+        **kwargs:
+            The parameters needed to tune the algorithms. If nothing is provided default values are used.
+            In particular:
+            - Ball Pivoting: need to specify "radius_factor", which is a factor that is multiplied by the average
+            distance between nearest points (a proxy for the mean edge length) to get the radius of the ball in 
+            the algorithm. Default: radius_factor = 1.5
+            - Screened Poisson Reconstruction: NOT DONE YET
+        """ 
+
+        assert len(self.points) > 0, "Before interpolation you have to compute a point cloud relative to the shell."
+
+        radius_factor = kwargs["radius_factor"] if "radius_factor" in kwargs else 1.5
+        # SCREENED POISSON RECONSTRUCTION PARAMETERS
+
+        # Estimate normals
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = o3d.utility.Vector3dVector(self.points)
+        pcd.estimate_normals(fast_normal_computation=False)
+        pcd.orient_normals_consistent_tangent_plane(k=10)
+
+        if algortihm == "ball_pivoting":
+            radius = radius_factor * self.mean_point_distance 
+
+            mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(
+                    pcd,
+                    o3d.utility.DoubleVector([radius, radius * 2])
+            )
+
+            # create the triangular mesh with the vertices and faces from open3d
+            self.mesh = trimesh.Trimesh(
+                np.asarray(mesh.vertices), np.asarray(mesh.triangles),
+                vertex_normals=np.asarray(mesh.vertex_normals)
+            )
+                
+
 
 
 
