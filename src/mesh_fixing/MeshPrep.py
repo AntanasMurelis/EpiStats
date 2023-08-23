@@ -14,6 +14,8 @@ from itertools import combinations
 from typing import Union, List, Tuple, Optional, Literal
 from skimage import io
 from scipy.ndimage import binary_dilation, binary_closing
+from OuterShell import ExtendedTrimesh, OuterShell
+from utils import get_cell_neighbors
 """Script for remeshing and preparing meshes for the SimuCell3D."""
 
 
@@ -654,8 +656,6 @@ def add_cell_data_to_vtk(vtk_file, cell_labels):
 
 
 
-
-
 #---------------------------------------------------------------------------------------------------------------
 def convert_cell_labels_to_meshes(
     img: np.ndarray[float],
@@ -723,6 +723,102 @@ def convert_cell_labels_to_meshes(
 #---------------------------------------------------------------------------------------------------------------
 
 
+#---------------------------------------------------------------------------------------------------------------
+def create_shell_from_image(
+    labeled_image: np.ndarray[int],
+    cell_idxs: List[int],
+    smoothing_iters: Optional[int] = 10,
+    dilation_iters: Optional[int] = 3, 
+    closing_iters: Optional[int] = 2
+) -> trimesh.Trimesh:
+    """
+    Create shell mesh starting from a labeled 3D image.
+
+    Parameters:
+    -----------
+
+    labeled_image: (np.ndarray[int])
+        A 3D image of segmented cells.
+    cell_idxs: (List[int])
+        List of cell ids to envelope in the shell.
+    smoothing_iters (Optional[int] = 10):
+        The number of smoothing iterations to apply to created meshes. Defaults to 10.
+    dilation_iters (Optional[int] = 3): 
+        The number of iterations for the dilation operation. Defaults to 3.
+    closing_iters (Optional[int] = 2): 
+        The number of iterations for the closing operation. Defaults to 2.
+    
+    Returns:
+    --------
+    (trimesh.Trimesh):
+        The mesh associated to the outer shell.
+    """
+    # Create a shell mask with all labels in the list
+    shell_mask = np.isin(labeled_image, cell_idxs)
+
+    # Apply dilation and closing to the big mask
+    shell_mask = binary_dilation(shell_mask, iterations=dilation_iters)
+    shell_mask = binary_closing(shell_mask, iterations=closing_iters)
+
+    # Create mesh from voxelized image
+    shell_mesh = convert_cell_labels_to_meshes(
+        shell_mask, voxel_resolution=voxel_resolution, smoothing_iterations=smoothing_iters
+    )
+
+    return shell_mesh 
+#---------------------------------------------------------------------------------------------------------------
+
+
+#---------------------------------------------------------------------------------------------------------------
+def create_shell_from_meshes(
+    meshes: List[trimesh.Trimesh],
+    cell_idxs: List[int],
+    cell_stats_data_path: str,
+) -> trimesh.Trimesh:
+    """
+    Create shell mesh starting from a labeled 3D image.
+
+    Parameters:
+    -----------
+
+    meshes: (List[trimesh.Trimesh])
+        The list of meshes to envelope in the shell.
+    cell_idxs: (List[int])
+        List of cell ids to envelope in the shell.
+    cell_stats_data_path: (str)
+        The path to the cell statistics dataframe, needed to extract cell neighbors information.
+
+    Returns:
+    --------
+
+    (trimesh.Trimesh):
+        The mesh associated to the outer shell.
+    """
+
+    # Get list of cell neighbors
+    neighbors_lst = get_cell_neighbors(
+        path_to_stats_df=cell_stats_data_path,
+        cell_ids=cell_idxs
+    )
+    
+    # Convert meshes in ExtendedTrimesh format
+    extended_meshes = []
+    for i, mesh in enumerate(meshes):
+        extended_meshes.append(ExtendedTrimesh(neighbors=neighbors_lst[i], vertices=mesh.vertices, faces=mesh.faces))
+
+    # Initialize an `OuterShell` object
+    outer_shell = OuterShell(
+        meshes=extended_meshes, 
+        neighbors_lst=neighbors_lst
+    )
+
+    # Build outer shell mesh
+    outer_shell.generate_outer_shell()
+
+    return outer_shell.mesh
+
+#---------------------------------------------------------------------------------------------------------------
+
 
 #---------------------------------------------------------------------------------------------------------------
 def create_and_export_meshes(
@@ -730,26 +826,44 @@ def create_and_export_meshes(
         image_path: str, 
         output_dir: str,
         voxel_resolution: np.ndarray, 
+        path_to_cell_stats_df: str,
         make_shell: bool = True, 
-        shell_type: Literal["voxel", "mesh"] = "mesh",
+        shell_type: Literal["from_image", "from_mesh"] = "from_mesh",
         smoothing_iterations: int = 10,
-        dilation_iter: int = 3, 
-        closing_iter: int = 2
+        dilation_iterations: int = 3, 
+        closing_iterations: int = 2
     ) -> str:
     """
     This function creates and exports meshes for each label in a given image.
     
     Parameters:
-    - cell_labels (list): A list of labels to be processed.
-    - image_path (str): The path to the image file.
-    - output_dir (str): The directory where the output will be saved.
-    - voxel_resolution (np.ndarray): The resolution of the voxels in the image.
-    - make_shell (bool, optional): Whether to create a shell when creating the meshes. Defaults to True.
-    - dilation_iter (int, optional): The number of iterations for the dilation operation. Defaults to 3.
-    - closing_iter (int, optional): The number of iterations for the closing operation. Defaults to 2.
+    cell_labels (list): 
+        A list of labels to be processed.
+    image_path (str): 
+        The path to the image file.
+    output_dir (str): 
+        The directory where the output will be saved.
+    voxel_resolution (np.ndarray): 
+        The resolution of the voxels in the image.
+    path_to_cell_stats_df: (str)
+        The path to the cell statistics dataframe, needed to extract cell neighbors information
+        to generate the shell mesh.
+    make_shell (bool, optional): 
+        Whether to create a shell when creating the meshes. Defaults to True.
+    shell_type(Literal["from_image", "from_mesh"], optional): 
+        Whether to create the outer shell starting from voxelized image or from cell meshes. 
+        The first approach is definitely faster but the second allows to get an outer shell that
+        adhere more tightly to the cell meshes.
+    smoothing_iterations (int, optional):
+        The number of smoothing iterations to apply to created meshes. Defaults to 10.
+    dilation_iterations (int, optional): 
+        The number of iterations for the dilation operation. Defaults to 3.
+    closing_iterations (int, optional): 
+        The number of iterations for the closing operation. Defaults to 2.
     
     Returns:
-    - str: The path to the directory where the meshes were saved.
+    (str): 
+        The path to the directory where the meshes were saved.
     """
     
     print('-------------------------------------------')
@@ -776,16 +890,22 @@ def create_and_export_meshes(
 
     # Make a combined mesh
     if make_shell:
-        big_mask = np.isin(labeled_img, cell_labels)
+        if shell_type == "from_image":
+            big_mesh = create_shell_from_image(
+                labeled_image=labeled_img,
+                cell_ids=cell_labels,
+                smoothing_iters=smoothing_iterations,
+                dilation_iters=dilation_iterations,
+                closing_iters=closing_iterations
+            )
+        elif shell_type == "from_mesh":
+            big_mesh = create_shell_from_meshes(
+                meshes=mesh_lst,
+                cell_idxs=cell_labels,
+                cell_stats_data_path=path_to_cell_stats_df
+            )
+
         
-        # Apply dilation and closing to the big mask
-        big_mask = binary_dilation(big_mask, iterations=dilation_iter)
-        big_mask = binary_closing(big_mask, iterations=closing_iter)
-        
-        big_mesh = convert_cell_labels_to_meshes(
-            big_mask, voxel_resolution=voxel_resolution, smoothing_iterations=smoothing_iterations
-        )
-    
     # Create the output directory if it doesn't exist
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -808,27 +928,38 @@ def create_and_export_meshes(
 
 #---------------------------------------------------------------------------------------------------------------
 def mesh_process_clean(
-        label_path: str, 
-        output_dir: str, 
-        label_list: list, 
-        voxel_resolution: np.ndarray, 
-        scale_factor: float = 1e-6, 
-        min_edge_length: float = 0.9, 
-        make_shell: bool = True, 
-        inter_meshes: bool = False
-    ):
+    label_path: str, 
+    output_dir: str, 
+    label_list: list, 
+    voxel_resolution: np.ndarray, 
+    path_to_cell_stats_df: str,
+    scale_factor: float = 1e-6, 
+    min_edge_length: float = 0.9, 
+    make_shell: bool = True, 
+    inter_meshes: bool = False
+):
     """
     This function processes a mesh by cleaning, remeshing, converting to vtk format, merging, and adding cell data for SimuCell3D.
     
     Parameters:
-    - label_path (str): The path to the label data.
-    - output_dir (str): The directory where the output will be saved.
-    - label_list (list): A list of labels to be processed.
-    - voxel_resolution (np.ndarray): The resolution of the voxels in the image.
-    - scale_factor (float, optional): The scale factor to be used when merging vtk files. Defaults to 1e-6.
-    - min_edge_length (float, optional): The minimum edge length to be used when remeshing (in micrometers). Defaults to 0.9.
-    - make_shell (bool, optional): Whether to create a shell when creating the meshes. Defaults to True.
-    - inter_meshes (bool, optional): Whether to keep the intermediate mesh files. If False, these files will be deleted. Defaults to True.
+    label_path (str): 
+        The path to the label data.
+    output_dir (str): 
+        The directory where the output will be saved.
+    label_list (list): 
+        A list of labels to be processed.
+    voxel_resolution (np.ndarray): 
+        The resolution of the voxels in the image.
+    path_to_cell_stats_df: (str)
+        The path to the cell statistics dataframe, needed to extract cell neighbors information
+    scale_factor (float, optional): 
+        The scale factor to be used when merging vtk files. Defaults to 1e-6.
+    min_edge_length (float, optional): 
+        The minimum edge length to be used when remeshing (in micrometers). Defaults to 0.9.
+    make_shell (bool, optional): 
+        Whether to create a shell when creating the meshes. Defaults to True.
+    inter_meshes (bool, optional): 
+        Whether to keep the intermediate mesh files. If False, these files will be deleted. Defaults to True.
     
     Returns:
     - str: The path to the final merged vtk file.
