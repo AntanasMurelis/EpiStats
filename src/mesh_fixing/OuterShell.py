@@ -424,27 +424,43 @@ class OuterShell:
         Generate a surface mesh from the point cloud using one of the available algorithms, namely
         Ball Pivoting, or Screened Poisson Reconstruction.
 
-        NOTE: the algorithm for mesh reconstruction are taken from `Open3D` python module.
-
         Parameters:
         -----------
-        algorithm: (Literal["ball_pivoting", "poisson"] = "ball_pivoting")
+        algorithm: (Literal["ball_pivoting", "poisson"] = "poisson")
             The algorithm employed for surface reconstruction. If "ball_pivoting", the Ball Pivoting 
             algorithm is used. If "poisson", the Screen Poisson Reconstruction algorithm is used instead.
 
         **kwargs:
             The parameters needed to tune the algorithms. If nothing is provided default values are used.
-            In particular:
-            - Ball Pivoting: need to specify "radius_factor", which is a factor that is multiplied by the average
-            distance between nearest points (a proxy for the mean edge length) to get the radius of the ball in 
-            the algorithm. Default: radius_factor = 1.5
-            - Screened Poisson Reconstruction: NOT DONE YET
+            
+        NOTE: about parameters for reconstruction algorithms:
+        - Ball Pivoting: 
+            1. "radius_factor": a multiplying factor for the average distance between nearest points
+            (a proxy for the mean edge length) to get the radius of the ball in the algorithm. 
+            (Default: 1.5)
+        - Screened Poisson Reconstruction: 
+            1. "depth": the tree-depth used for the reconstruction. The higher the more detailed the mesh.
+            (Default: 8)
+            2. "width": the target width of the finest level of the octree. This parameter is ignored if 
+            the depth is specified.
+            (Default: 0)
+            3. "scale": the ratio between the diameter of the cube used for reconstruction and the diameter 
+            of the samples' bounding cube. Often the default value works well enough.
+            (Default: 1.1)
+            4. "linear_fit": if set to true, let the reconstructor use linear interpolation to estimate the
+            positions of iso-vertices.
+            (Default: False)
+
+        NOTE: the algorithms for mesh reconstruction are taken from `Open3D` python module.
         """ 
 
         assert len(self.points) > 0, "Before interpolation you have to compute a point cloud relative to the shell."
 
         radius_factor = kwargs["radius_factor"] if "radius_factor" in kwargs else 1.5
-        # SCREENED POISSON RECONSTRUCTION PARAMETERS
+        depth = kwargs["depth"] if "depth" in kwargs else 8
+        width = kwargs["width"] if "width" in kwargs else 0
+        scale = kwargs["scale"] if "scale" in kwargs else 1.1
+        linear_fit = kwargs["linear_fit"] if "linear_fit" in kwargs else False
 
         # Estimate normals
         pcd = o3d.geometry.PointCloud()
@@ -454,17 +470,21 @@ class OuterShell:
 
         if algortihm == "ball_pivoting":
             radius = radius_factor * self.mean_point_distance 
-
             mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(
-                    pcd,
-                    o3d.utility.DoubleVector([radius, radius * 2])
+                    pcd, o3d.utility.DoubleVector([radius, radius * 2])
             )
+        elif algortihm == "poisson":
+            mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_poisson(
+                pcd, depth=depth, width=width, scale=scale, linear_fit=linear_fit
+            )[0]  
+        else:
+            ValueError(f"The algorithm {algortihm} is not available. Please choose one among ['ball_pivoting', 'poisson']")
 
-            # create the triangular mesh with the vertices and faces from open3d
-            self.mesh = trimesh.Trimesh(
-                np.asarray(mesh.vertices), np.asarray(mesh.triangles),
-                vertex_normals=np.asarray(mesh.vertex_normals)
-            )
+        # create the triangular mesh with the vertices and faces from open3d
+        self.mesh = trimesh.Trimesh(
+            np.asarray(mesh.vertices), np.asarray(mesh.triangles),
+            vertex_normals=np.asarray(mesh.vertex_normals)
+        )
                 
 
 
