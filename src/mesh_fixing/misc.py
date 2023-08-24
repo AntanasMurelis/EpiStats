@@ -6,8 +6,11 @@ import numpy as np
 from tqdm import tqdm
 from typing import List, Set
 
-sys.path.append('/nas/groups/iber/Users/Federico_Carrara/Statistics_Collection/EpiStats/src/statistics_collection/')
-from StatsAnalytics import prepare_df
+PROJECT_ROOT = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), os.pardir)
+)
+sys.path.append(PROJECT_ROOT)
+from statistics_collection.scripts.StatsAnalytics import prepare_df
 
 
 #---------------------------------------------------------------------------------------------------------------------
