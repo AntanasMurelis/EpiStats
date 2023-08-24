@@ -103,7 +103,8 @@ def get_cell_neighbors(
     """
 
     cell_stats_df = prepare_df([path_to_stats_df])
-    cell_neighbors_lst = cell_stats_df["cell_ID" in cell_ids]["neigbors"].tolist()
+    id_mask = np.isin(cell_stats_df["cell_ID"], cell_ids)
+    cell_neighbors_lst = cell_stats_df[id_mask]["neighbors"].tolist()
 
     return cell_neighbors_lst
 #---------------------------------------------------------------------------------------------------------------------

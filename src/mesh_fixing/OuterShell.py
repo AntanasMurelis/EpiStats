@@ -17,7 +17,7 @@ class ExtendedTrimesh(trimesh.Trimesh):
     def __init__(
             self, 
             neighbors: Optional[List[int]] = None,
-            k_percent: Optional[float] = 0.05,
+            k_percent: Optional[float] = None,
             *args, **kwargs):
         """
         Initialize the ExtendedTrimesh object.
@@ -28,8 +28,10 @@ class ExtendedTrimesh(trimesh.Trimesh):
         neighbors: (Optional[List[int]] = None)
             A list of neighbors of this mesh
 
-        k_percent: (Optional[float] = 0.1)
+        k_percent: (Optional[float] = None)
             The percentual of vertices over the total to take as the closest.
+            If `None`, `k_closest_dict` is not computed.
+            Reasonable values are in the range [0.05, 0.1].
 
         *args, **kwargs: 
             Thes refer to the standard parameters for trimesh.Trimesh class (e.g., file name, vertices and faces arrays, etc.)
@@ -46,7 +48,7 @@ class ExtendedTrimesh(trimesh.Trimesh):
         # Array storing for each vertex the index of the closest neighbors
         self.closest_neigh_idxs = np.zeros(len(self.vertices)) 
         # Dictionary that associate to each neighbor index a list of vertices idxs that are the k-closest to that neighbor
-        self.k = int(k_percent * len(self.vertices))
+        self.k = (int(k_percent * len(self.vertices))) if k_percent else None
         self.k_closest_dict = {}
         # Dictionary that stores the KDTree for each subset of k-closest points
         self.k_closest_kdtrees = {}
@@ -190,8 +192,9 @@ class ExtendedTrimesh(trimesh.Trimesh):
         pc.points = o3d.utility.Vector3dVector(self.filtered_vertices)
         self.avg_point_distance = np.mean(pc.compute_nearest_neighbor_distance())
 
-        # Create `k_closest_dict` with remaining points
-        self.get_k_closest_vertices(self.k)
+        if self.k:
+            # Create `k_closest_dict` with remaining points
+            self.get_k_closest_vertices(self.k)
 
 #-----------------------------------------------------------------------------------------------------------------
 
@@ -206,7 +209,6 @@ class OuterShell:
             self,
             meshes: List[ExtendedTrimesh],
             neighbors_lst: List[List[int]],
-            min_edge_length: float
     ):
         """
         Create an OuterShell mesh from a collection of smaller ExtendedTrimesh objects.
@@ -224,7 +226,7 @@ class OuterShell:
         # The list of neighbors associated to each mesh in meshes (private)
         self._neighbors_lst = neighbors_lst if neighbors_lst else None
         # The length in microns of the shortest edge in the mesh (private)
-        self.min_edge_length = np.mean([mesh.min_edge_length for mesh in self._meshes])
+        self.min_edge_length = np.mean([mesh.min_point_distance for mesh in self._meshes])
         # The mean distance between each point and the nearest neighbor in the point cloud
         self._mean_point_distance = None
         # The array of points coordinates to generate the outer shell mesh from
@@ -258,7 +260,7 @@ class OuterShell:
         shell_points = []
         shell_normals = []
         for i, (mesh, neighbors) in tqdm(enumerate(zip(self._meshes, self._neighbors_lst)), total=len(self._meshes)):
-            assert isinstance(mesh, ExtendedTrimesh), "Current mesh is not an ExtendedTrimesh object."
+            # assert isinstance(mesh, ExtendedTrimesh), "Current mesh is not an ExtendedTrimesh object."
 
             mesh.compute_min_distances([self._meshes[neighbor] for neighbor in neighbors])
             mesh.threshold_vertices(dist_threshold * self.min_edge_length)
@@ -301,7 +303,11 @@ class OuterShell:
         If `order=='2'`, the actual number of sampled points is greater than n (see `sample_points_from_vertices`).
         """
 
-        assert len(self.points) > 0, "Before interpolation you have to compute the point cloud for the shell."
+        assert len(self.points) > 0, "Before interpolation you must compute the point cloud for the shell."
+        assert self._meshes[0].k, (
+            "Before interpolation you must compute k_closest_dict for each mesh."
+            "To do so set a value for `k_percent` when initializing ExtendedTrimesh objects."
+        ) 
 
         # 1. Get all pairs of neighbors
         neighbor_pairs = set()
@@ -575,14 +581,17 @@ class OuterShell:
 
         print("    Computing shell point cloud...")
         self.get_shell_point_cloud(dist_threshold=threshold_distance)
+        print("    Done!\n")
 
         if interp_gaps:
             print("    Interpolating gaps between cells...")
             self.interpolate_gaps(**interp_params)
+            print("    Done!\n")
 
         if displace_points:
             print("    Displacing points along normal directions...")
             self.displace_point_cloud(**displace_params)
+            print("    Done!\n")
 
         print("    Reconstructing mesh from point cloud...")
         self.generate_mesh_from_point_cloud(
@@ -590,6 +599,7 @@ class OuterShell:
             estimate_normals=estimate_vertex_normals,
             **reconstruction_params
         )
+        print("    Done!\n")
 
     def mesh_to_file(
             self,

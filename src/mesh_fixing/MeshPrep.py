@@ -11,11 +11,11 @@ from napari_process_points_and_surfaces import label_to_surface
 from tqdm import tqdm
 from collections import Counter
 from itertools import combinations
-from typing import Union, List, Tuple, Optional, Literal
+from typing import List, Optional, Literal
 from skimage import io
 from scipy.ndimage import binary_dilation, binary_closing
 from OuterShell import ExtendedTrimesh, OuterShell
-from utils import get_cell_neighbors
+from misc import get_cell_neighbors
 """Script for remeshing and preparing meshes for the SimuCell3D."""
 
 
@@ -727,6 +727,7 @@ def convert_cell_labels_to_meshes(
 def create_shell_from_image(
     labeled_image: np.ndarray[int],
     cell_idxs: List[int],
+    voxel_size: np.ndarray,
     smoothing_iters: Optional[int] = 10,
     dilation_iters: Optional[int] = 3, 
     closing_iters: Optional[int] = 2
@@ -741,6 +742,8 @@ def create_shell_from_image(
         A 3D image of segmented cells.
     cell_idxs: (List[int])
         List of cell ids to envelope in the shell.
+    voxel_size: (np.ndarray[float])
+        The size of the voxels in the image along x,y,z dimensions.
     smoothing_iters (Optional[int] = 10):
         The number of smoothing iterations to apply to created meshes. Defaults to 10.
     dilation_iters (Optional[int] = 3): 
@@ -763,7 +766,7 @@ def create_shell_from_image(
 
     # Create mesh from voxelized image
     shell_mesh = convert_cell_labels_to_meshes(
-        shell_mask, voxel_resolution=voxel_resolution, smoothing_iterations=smoothing_iters
+        shell_mask, voxel_resolution=voxel_size, smoothing_iterations=smoothing_iters
     )
 
     return shell_mesh 
@@ -775,6 +778,7 @@ def create_shell_from_meshes(
     meshes: List[trimesh.Trimesh],
     cell_idxs: List[int],
     cell_stats_data_path: str,
+    w_displacement: Optional[bool] = True
 ) -> trimesh.Trimesh:
     """
     Create shell mesh starting from a meshes of the single cells.
@@ -788,6 +792,10 @@ def create_shell_from_meshes(
         List of cell ids to envelope in the shell.
     cell_stats_data_path: (str)
         The path to the cell statistics dataframe, needed to extract cell neighbors information.
+    w_displacement: (Optional[bool] = True)
+        If `True`, the shell mesh will be created after displacing the relative point cloud
+        along the directions defined by the normals to the points, to be sure that all the 
+        cell meshes are well contained in the envelope.
 
     Returns:
     --------
@@ -796,25 +804,37 @@ def create_shell_from_meshes(
         The mesh associated to the outer shell.
     """
 
+    assert len(meshes) == len(cell_idxs), f"The number of meshes {len(meshes)} differs from the number of cell ids {len(cell_idxs)}."
+
     # Get list of cell neighbors
     neighbors_lst = get_cell_neighbors(
         path_to_stats_df=cell_stats_data_path,
         cell_ids=cell_idxs
     )
+
+    # NOTE: neighbor ids are now referred to the whole sample. Hence we need to: 
+    # - filter out neighbor ids that are not considered for the patch
+    # - map these ids to the ones relative to the current patch of cells
+    idxs_map = dict(zip(cell_idxs, np.arange(len(meshes))))
+    mapped_neighbors_lst = []
+    for cell_neighbors in neighbors_lst:
+        mapped_neighbors_lst.append([idxs_map[idx] for idx in cell_neighbors if idx in cell_idxs])
     
     # Convert meshes in ExtendedTrimesh format
     extended_meshes = []
     for i, mesh in enumerate(meshes):
-        extended_meshes.append(ExtendedTrimesh(neighbors=neighbors_lst[i], vertices=mesh.vertices, faces=mesh.faces))
+        extended_meshes.append(
+            ExtendedTrimesh(neighbors=neighbors_lst[i], vertices=mesh.vertices, faces=mesh.faces)
+        )
 
     # Initialize an `OuterShell` object
     outer_shell = OuterShell(
         meshes=extended_meshes, 
-        neighbors_lst=neighbors_lst
+        neighbors_lst=mapped_neighbors_lst
     )
 
     # Build outer shell mesh
-    outer_shell.generate_outer_shell()
+    outer_shell.generate_outer_shell(displace_points=w_displacement)
 
     return outer_shell.mesh
 
@@ -830,6 +850,7 @@ def create_and_export_meshes(
         path_to_cell_stats_df: str,
         make_shell: bool = True, 
         shell_type: Literal["from_image", "from_mesh"] = "from_mesh",
+        displace_shell_pts: Optional[bool] = True,
         smoothing_iterations: int = 10,
         dilation_iterations: int = 3, 
         closing_iterations: int = 2
@@ -855,6 +876,10 @@ def create_and_export_meshes(
         Whether to create the outer shell starting from voxelized image or from cell meshes. 
         The first approach is definitely faster but the second allows to get an outer shell that
         adhere more tightly to the cell meshes.
+    displace_shell_pts: (bool, optional)
+        If `True`, the shell mesh will be created after displacing the relative point cloud
+        along the directions defined by the normals to the points, to be sure that all the 
+        cell meshes are well contained in the envelope.
     smoothing_iterations (int, optional):
         The number of smoothing iterations to apply to created meshes. Defaults to 10.
     dilation_iterations (int, optional): 
@@ -896,6 +921,7 @@ def create_and_export_meshes(
             big_mesh = create_shell_from_image(
                 labeled_image=labeled_img,
                 cell_ids=cell_labels,
+                voxel_size=voxel_resolution,
                 smoothing_iters=smoothing_iterations,
                 dilation_iters=dilation_iterations,
                 closing_iters=closing_iterations
@@ -904,10 +930,10 @@ def create_and_export_meshes(
             big_mesh = create_shell_from_meshes(
                 meshes=mesh_lst,
                 cell_idxs=cell_labels,
-                cell_stats_data_path=path_to_cell_stats_df
+                cell_stats_data_path=path_to_cell_stats_df,
+                w_displacement=displace_shell_pts
             )
 
-        
     # Create the output directory if it doesn't exist
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -937,7 +963,9 @@ def mesh_process_clean(
     path_to_cell_stats_df: str,
     scale_factor: float = 1e-6, 
     min_edge_length: float = 0.9, 
-    make_shell: bool = True, 
+    make_shell: bool = True,
+    shell_type: Literal["from_image", "from_mesh"] = "from_mesh",
+    displace_shell_pts: Optional[bool] = True,    
     inter_meshes: bool = False
 ):
     """
@@ -960,6 +988,14 @@ def mesh_process_clean(
         The minimum edge length to be used when remeshing (in micrometers). Defaults to 0.9.
     make_shell (bool, optional): 
         Whether to create a shell when creating the meshes. Defaults to True.
+    shell_type(Literal["from_image", "from_mesh"], optional): 
+        Whether to create the outer shell starting from voxelized image or from cell meshes. 
+        The first approach is definitely faster but the second allows to get an outer shell that
+        adhere more tightly to the cell meshes.
+    displace_shell_pts: (bool, optional)
+        If `True`, the shell mesh will be created after displacing the relative point cloud
+        along the directions defined by the normals to the points, to be sure that all the 
+        cell meshes are well contained in the envelope.
     inter_meshes (bool, optional): 
         Whether to keep the intermediate mesh files. If False, these files will be deleted. Defaults to True.
     
@@ -972,8 +1008,11 @@ def mesh_process_clean(
         cell_labels=label_list, 
         image_path=label_path, 
         output_dir=output_dir, 
+        path_to_cell_stats_df=path_to_cell_stats_df,
         voxel_resolution=voxel_resolution, 
-        make_shell=make_shell
+        make_shell=make_shell,
+        shell_type=shell_type,
+        displace_shell_pts=displace_shell_pts
     )
 
     # Clean the meshes for the first time
@@ -1122,99 +1161,21 @@ def main():
     ```
     """
 
-    # Define the parameters
-    # voxel_resolution = np.array([0.21, 0.21, 0.39])
-    # label_path = '/Users/antanas/BC_Project/No_Edge_5000/No_edge2/Validated_labels_Franzi_Control_s_10_e_2_d_3/processed_labels.npy'
-    # label_list = [111, 112, 114, 125, 126, 129, 134, 137, 139, 140, 143, 145, 152, 154, 167, 168, 169, 171, 172, 209, 88, 91] 
-    # output_dir = '/Users/antanas/BC_Project/Experiment_22_condensed'
-    voxel_resolution = np.array([0.325, 0.325, 0.25])
-    label_list = np.array([138, 167, 168, 169, 179, 194, 203, 225, 241, 312]) - 1
-    label_path = '/Users/antanas/Federico_Simulations/processed_labels.tif'
-    output_dir = '/Users/antanas/BC_Project/Experiment_Federico_condensed'
+    voxel_resolution = np.array([1., 1., 1.])
+    label_list = np.array([1, 2, 3, 4])
+    label_path = 'path/to/processed/labels.tif'
+    output_dir = 'path/to/output'
     
     
     # Call the mesh_process_clean function
-    mesh_process_clean(label_path=label_path, output_dir=output_dir, label_list=label_list, voxel_resolution=voxel_resolution, scale_factor=1, make_shell=True)
+    mesh_process_clean(
+        label_path=label_path, 
+        output_dir=output_dir, 
+        label_list=label_list, 
+        voxel_resolution=voxel_resolution, 
+        scale_factor=1, 
+        make_shell=True
+    )
 
 if __name__ == "__main__":
     main()
-
-
-
-if __name__ == "__main__":
-    
-    """
-    Please ensure that the path to label is preprocessed (perform erosion/dilation/removal of detached regions etc...)
-    
-    Example Usage:
-    
-    ```
-    voxel_resolution = np.array([0.21, 0.21, 0.39])
-    label_path = '/path/to/processed_labels.npy'
-    label_list = [111, 112, 114, 125, 126, 129, 134, 137, 139, 140, 143, 145, 152, 154, 167, 168, 169, 171, 172, 209, 88, 91] 
-    # or label_list = string_to_numbers("106 110 127 136 140 141 160 162 170 177 179 180 188 201 202 204 223 230 231 236 243 244 251 257 280 322 331 84 96 100")
-    output_dir = '/path/to/output/Experiment_20_condensed'
-    mesh_process_clean(label_path=label_path, output_dir=output_dir, label_list=label_list, voxel_resolution=voxel_resolution, scale_factor=1e-6, make_shell=True)
-    ```
-    """
-    
-    
-    voxel_resolution = np.array([0.21, 0.21, 0.39])
-    #output_dir = '/Users/antanas/BC_Project/Experiment_12'
-    # label_path = '/Users/antanas/BC_Project/Control_Segmentation_final/BC_control_s_5_e_2_d_5/processed_labels.npy'
-    # # label_list = [530, 163, 110, 146, 594, 109, 138, 115, 157, 533, 94, 145, 155, 164, 200, 129, 178, 201, 241, 522]
-    
-    # label_path = '/Users/antanas/BC_Project/No_Edge_5000/No_edge2/Validated_labels_Franzi_11w_s_10_e_2_d_3/processed_labels.npy'
-    # # label_list = [243, 236, 322, 280, 331, 320, 236, 235, 374, 285, 343, 250, 350]
-    # # mesh_process_clean(label_path=label_path, output_dir=output_dir, label_list=label_list, voxel_resolution=voxel_resolution, scale_factor=1e-6)    
-    
-    # output_dir = '/Users/antanas/BC_Project/Experiment_12'
-    # label_list = list(bfs_from_csv_or_df('/Users/antanas/BC_Project/No_Edge_5000/No_edge2/Validated_labels_Franzi_11w_s_10_e_2_d_3/filtered_cell_statistics.csv', 100))
-    # mesh_process_clean(label_path=label_path, output_dir=output_dir, label_list=label_list, voxel_resolution=voxel_resolution, scale_factor=1e-6, make_shell=False)
-    
-    # label_path = '/Users/antanas/BC_Project/No_Edge_5000/No_edge2/Validated_labels_Franzi_Control_s_10_e_2_d_3/processed_labels.npy'
-    # output_dir = '/Users/antanas/BC_Project/Experiment_17'
-    # # label_list = read_cell_ids('/Users/antanas/BC_Project/No_Edge_5000/No_edge2/Validated_labels_Franzi_4w_s_10_e_2_d_3/filtered_cell_statistics.csv')
-    # label_list = read_cell_ids('/Users/antanas/BC_Project/No_Edge_5000/No_edge2/Validated_labels_Franzi_Control_s_10_e_2_d_3/filtered_cell_statistics.csv')
-    # isolate_filtered_meshes(input_dir='/Users/antanas/BC_Project/No_Edge_5000/No_edge2/Validated_labels_Franzi_Control_s_10_e_2_d_3/cell_meshes', output_dir=output_dir, filtered_cell_ids=label_list)
-    #mesh_process_clean(label_path=label_path, output_dir=output_dir, label_list=label_list, voxel_resolution=voxel_resolution, scale_factor=1e-6, make_shell=False)
-    
-    # label_list = [110, 127, 136, 140, 141, 162, 170, 180, 188, 201, 202, 231, 236, 243, 244, 251, 257, 280, 322, 331, 96]
-    # output_dir = '/Users/antanas/BC_Project/Experiment_15'
-    # mesh_process_clean(label_path=label_path, output_dir=output_dir, label_list=label_list, voxel_resolution=voxel_resolution, scale_factor=1e-6, make_shell=True)
-    # label_path = '/Users/antanas/BC_Project/No_Edge_5000/No_edge2/Validated_labels_Franzi_4w_s_10_e_2_d_3/processed_labels.npy'
-    # label_list = [190, 207, 212, 221, 225, 227, 230, 235, 242, 254, 259, 262, 286, 293, 297, 306, 444]
-    # output_dir = '/Users/antanas/BC_Project/Experiment_16_condensed'
-    # mesh_process_clean(label_path=label_path, output_dir=output_dir, label_list=label_list, voxel_resolution=voxel_resolution, scale_factor=1e-6, make_shell=True)
-
-    # label_path = '/Users/antanas/BC_Project/No_Edge_5000/No_edge2/Validated_labels_Franzi_4w_s_10_e_2_d_3/processed_labels.npy'
-    # label_list = [104, 112, 117, 125, 131, 140, 142, 143, 148, 157, 158, 160, 164, 168, 174, 190, 207, 212, 225, 98]
-    # output_dir = '/Users/antanas/BC_Project/Experiment_16_condensed_2'
-    # mesh_process_clean(label_path=label_path, output_dir=output_dir, label_list=label_list, voxel_resolution=voxel_resolution, scale_factor=1e-6, make_shell=True)    
-    
-    # voxel_resolution = np.array([0.21, 0.21, 0.39])
-    # label_path = '/Users/antanas/BC_Project/No_Edge_5000/No_edge2/Validated_labels_Franzi_Control_s_10_e_2_d_3/processed_labels.npy'
-    # label_list = [111, 112, 114, 125, 126, 129, 134, 137, 139, 140, 143, 145, 152, 154, 167, 168, 169, 171, 172, 209, 88, 91] 
-    # output_dir = '/Users/antanas/BC_Project/Experiment_20_condensed'
-    # mesh_process_clean(label_path=label_path, output_dir=output_dir, label_list=label_list, voxel_resolution=voxel_resolution, scale_factor=1e-6, make_shell=True)
-    
-    
-    # # for Steve:
-    
-    # label_path = '/Users/antanas/BC_Project/No_Edge_5000/No_edge2/Validated_labels_Franzi_11w_s_10_e_2_d_3/processed_labels.npy'
-    # output_dir = '/Users/antanas/BC_Project/Tr3_Steve'
-    # label_list = [124, 159, 161, 194, 195, 198, 201, 214, 220, 223, 231, 244, 248, 260, 261, 272, 276, 299, 300, 304, 305, 314, 330, 335, 353, 358, 370, 380, 405, 427, 431, 448] 
-    # mesh_process_clean(label_path=label_path, output_dir=output_dir, label_list=label_list, voxel_resolution=voxel_resolution, scale_factor=1e-6, make_shell=True)    
-
-
-    # # For Steve 2:
-    # label_path = '/Users/antanas/BC_Project/No_Edge_5000/No_edge2/Validated_labels_Franzi_11w_s_10_e_2_d_3/processed_labels.npy'
-    # output_dir = '/Users/antanas/BC_Project/Tr4_Steve'
-    # label_list = [113, 125, 130, 141, 148, 151, 159, 162, 168, 176, 195, 23, 223, 248, 28, 4, 41, 42, 50, 51, 62, 69, 70, 74, 79, 80, 82, 86, 91, 92, 100]
-    # mesh_process_clean(label_path=label_path, output_dir=output_dir, label_list=label_list, voxel_resolution=voxel_resolution, scale_factor=1e-6, make_shell=True)    
-
-    # For Steve 3:
-    # label_path = '/Users/antanas/BC_Project/No_Edge_5000/No_edge2/Validated_labels_Franzi_11w_s_10_e_2_d_3/processed_labels.npy'
-    # output_dir = '/Users/antanas/BC_Project/Tr5_Steve'
-    # label_list =  string_to_array("106 110 127 136 140 141 160 162 170 177 179 180 188 201 202 204 223 230 231 236 243 244 251 257 280 322 331 84 96 100")
-    # mesh_process_clean(label_path=label_path, output_dir=output_dir, label_list=label_list, voxel_resolution=voxel_resolution, scale_factor=1e-6, make_shell=True)    
