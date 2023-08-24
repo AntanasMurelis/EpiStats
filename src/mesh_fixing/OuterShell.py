@@ -257,7 +257,7 @@ class OuterShell:
 
         shell_points = []
         shell_normals = []
-        for i, (mesh, neighbors) in enumerate(zip(self._meshes, self._neighbors_lst)):
+        for i, (mesh, neighbors) in tqdm(enumerate(zip(self._meshes, self._neighbors_lst)), total=len(self._meshes)):
             assert isinstance(mesh, ExtendedTrimesh), "Current mesh is not an ExtendedTrimesh object."
 
             mesh.compute_min_distances([self._meshes[neighbor] for neighbor in neighbors])
@@ -312,7 +312,7 @@ class OuterShell:
 
         # 2. Iterate over the neighbor pairs
         all_sampled_points = []
-        for idx_1, idx_2 in neighbor_pairs:
+        for idx_1, idx_2 in tqdm(neighbor_pairs):
             mesh_1, mesh_2 = self._meshes[idx_1], self._meshes[idx_2]
             assert len(mesh_1.k_closest_dict) > 0, f"Mesh {idx_1} has empty k_closest_dict attribute."
             assert len(mesh_2.k_closest_dict) > 0, f"Mesh {idx_2} has empty k_closest_dict attribute."
@@ -573,14 +573,18 @@ class OuterShell:
             (Default: False)
         """
 
+        print("    Computing shell point cloud...")
         self.get_shell_point_cloud(dist_threshold=threshold_distance)
 
         if interp_gaps:
+            print("    Interpolating gaps between cells...")
             self.interpolate_gaps(**interp_params)
 
         if displace_points:
+            print("    Displacing points along normal directions...")
             self.displace_point_cloud(**displace_params)
 
+        print("    Reconstructing mesh from point cloud...")
         self.generate_mesh_from_point_cloud(
             algorithm=reconstruction_algorithm,
             estimate_normals=estimate_vertex_normals,

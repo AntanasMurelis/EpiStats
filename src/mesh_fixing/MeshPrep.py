@@ -750,6 +750,7 @@ def create_shell_from_image(
     
     Returns:
     --------
+
     (trimesh.Trimesh):
         The mesh associated to the outer shell.
     """
@@ -776,7 +777,7 @@ def create_shell_from_meshes(
     cell_stats_data_path: str,
 ) -> trimesh.Trimesh:
     """
-    Create shell mesh starting from a labeled 3D image.
+    Create shell mesh starting from a meshes of the single cells.
 
     Parameters:
     -----------
@@ -889,6 +890,7 @@ def create_and_export_meshes(
         mesh_lst.append(mesh)
 
     # Make a combined mesh
+    print(f"Generating shell mesh {shell_type.replace('_', ' ')}...")
     if make_shell:
         if shell_type == "from_image":
             big_mesh = create_shell_from_image(
