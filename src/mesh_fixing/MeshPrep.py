@@ -663,7 +663,7 @@ def convert_cell_labels_to_meshes(
     smoothing_iterations: Optional[int] = 1,
     output_directory: Optional[str] = 'output',
     pad_width: Optional[int] = 10,
-):
+) -> List[trimesh.Trimesh]:
     """
     Convert the labels of the cells in the 3D segmented image to triangular meshes. Please make sure that the 
     image has correctly been segmented, i.e. that there is no artificially small cells, or cell labels 
@@ -691,7 +691,7 @@ def convert_cell_labels_to_meshes(
 
     Returns:
     --------
-        mesh_lst (list):
+        mesh_lst (List[trimesh.Trimesh]):
             A list of triangular meshes, in the trimesh format.
     
     """
@@ -769,7 +769,7 @@ def create_shell_from_image(
         shell_mask, voxel_resolution=voxel_size, smoothing_iterations=smoothing_iters
     )
 
-    return shell_mesh 
+    return shell_mesh[0] 
 #---------------------------------------------------------------------------------------------------------------
 
 
@@ -912,7 +912,7 @@ def create_and_export_meshes(
         mesh = convert_cell_labels_to_meshes(
             mask, voxel_resolution=voxel_resolution, smoothing_iterations=smoothing_iterations
         )
-        mesh_lst.append(mesh)
+        mesh_lst.append(mesh[0])
 
     # Make a combined mesh
     print(f"Generating shell mesh {shell_type.replace('_', ' ')}...")
@@ -941,11 +941,11 @@ def create_and_export_meshes(
     # Export all the meshes
     for i, cell in enumerate(cell_labels):
         mesh_file_path = os.path.join(output_dir, f'cell_{cell}.stl')
-        mesh_lst[i][0].export(mesh_file_path)
+        mesh_lst[i].export(mesh_file_path)
         
     if make_shell:
         big_mesh_file_path = os.path.join(output_dir, 'large_mesh.stl')
-        big_mesh[0].export(big_mesh_file_path)
+        big_mesh.export(big_mesh_file_path)
 
     return output_dir
 #---------------------------------------------------------------------------------------------------------------
