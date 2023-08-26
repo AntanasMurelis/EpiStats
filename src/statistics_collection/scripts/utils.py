@@ -242,7 +242,7 @@ def _get_slices_along_direction(
     rot = _get_rotation(slicing_dir)
     
     # Compute the voxel sizes in the new coordinate system
-    new_axes_directions = rot.as_matrix() # (X, Y, Z as column vectors, Z is the principal axis)
+    new_axes_directions = rot[0].as_matrix() # (X, Y, Z as column vectors, Z is the principal axis)
     new_voxel_size = abs(np.dot(new_axes_directions, original_voxel_size))
 
     # Store identifiers of the different grids (centers and direction)
