@@ -401,7 +401,7 @@ def _compute_2D_area(
 def _compute_2D_neighbors(
         labeled_slice: np.ndarray[int], 
         exclude_labels: Iterable[int],
-        label_ids: Optional[np.ndarray[int]] = None
+        label_ids: Optional[np.ndarray[int]] = []
 ) -> Dict[int, List[int]]:
     """
     Given a 2D array of integer labels, compute the neighbors of each label.
@@ -412,7 +412,7 @@ def _compute_2D_neighbors(
         A 2D array of integer labels.
     exclude_labels: (Iterable[int])
         A list of labels to exclude from computation (e.g., not valid cells).
-    label_ids: (Optional[np.ndarray[int]] = None)
+    label_ids: (Optional[np.ndarray[int]] = [])
         The pre-computed label ids present in the image (to speed up computation).
 
     Returns:
@@ -421,7 +421,7 @@ def _compute_2D_neighbors(
         A dictionary that associates to each label a list of valid neighbors
     """
 
-    if not label_ids:
+    if len(label_ids) == 0:
         label_ids, _ = np.unique(labeled_slice)
     
     neighbors_dict = {}
