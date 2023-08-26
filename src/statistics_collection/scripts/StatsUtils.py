@@ -687,6 +687,19 @@ def compute_2D_statistics_along_axes(
            Dict[int, List[float]], 
            Dict[int, Dict[int, List[int]]], 
            Dict[int, Tuple[List[List[float]], List[float]]]]:
+    """
+    Compute cell statistics (area, neighbors and neighbors of neighbors) along slices obtained 
+    on the cells' principal axes directions.
+
+    Parameters:
+    -----------
+
+
+
+    Returns:
+    --------
+
+    """
     
     if np.any(slice_size > np.asarray(labeled_img.shape)):
         slice_size = np.min(labeled_img.shape)
@@ -705,7 +718,8 @@ def compute_2D_statistics_along_axes(
             cell_centroids[label_id] = None
             cell_lengths[label_id] = None
         else:
-            # Compute principal axis, axis length and centroid coordinates 
+            # Compute principal axis, axis length, centroid coordinates, and sequence of points
+            # along the principal axis direction 
             cell_mesh = cell_mesh_dict[label_id]
             principal_axis = _get_principal_axis(
                 mesh=cell_mesh,
@@ -739,13 +753,14 @@ def compute_2D_statistics_along_axes(
             slices_dict[label_id] = ()
         else:
             # Get slices along principal axis direction
-            labeled_slices, grid_coords, slices_specs = _get_slices_along_direction(
+            labeled_slices, grid_coords, new_voxel_size, slices_specs = _get_slices_along_direction(
                 labeled_img=labeled_img,
                 slicing_dir=cell_principal_axes[label_id],
                 centroid=cell_centroids[label_id],
                 height=cell_lengths[label_id],
                 grid_to_place=grid,
-                num_slices=number_slices
+                num_slices=number_slices,
+                original_voxel_size=voxel_size
             )
 
             # Iterate across slices to compute the statistics
@@ -756,7 +771,7 @@ def compute_2D_statistics_along_axes(
                 area_in_slice = _compute_2D_area_along_direction(
                     labeled_slice=labeled_slice,
                     cell_label=label_id,
-                    pixel_size=voxel_size[:2]
+                    pixel_size=new_voxel_size[:2]
                 )
                 cell_areas.append(area_in_slice)
 
