@@ -7,7 +7,7 @@ from tqdm import tqdm
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from collections import defaultdict
-from typing import Optional, Iterable, Tuple, Union, Literal, Callable, Dict
+from typing import Optional, Iterable, Tuple, Union, Literal, Callable, Dict, List
 
 
 
@@ -196,7 +196,7 @@ def _detect_volume_outliers(
 
     Returns:
     --------
-    out_df: (pd.Dataframe)
+    (pd.Dataframe)
         The same dataframe as the one in input, except for additional
         boolean columns `is_small_cell` and `is_large_cell` that mark
         cells with outlying values of volume.
@@ -241,9 +241,59 @@ of which:
 
 
 #------------------------------------------------------------------------------------------------------------
+def _detect_num_neighbors_outliers(
+        df: pd.DataFrame,
+        freq_threshold: Optional[float] = 0.025,
+) -> List[int]:
+    """
+    In the input cell statistics dataframe find the number of (3D) neighbors outliers, by excluding less 
+    frequent values, separately for each tissue.
+
+    Parameters:
+    -----------
+
+    df: (pd.DataFrame)
+        The cell statistics dataframe.
+
+    freq_threshold: (Optional[float] = 0.05)
+        Compute relative frequency of each number of neighbors. Values under this threshold are marked as outliers.
+
+    Returns:
+    --------
+
+    (pd.Dataframe)
+        The same dataframe as the one in input, except for additional
+        boolean columns `is_small_cell` and `is_large_cell` that mark
+        cells with outlying values of volume.
+    """
+
+    tissues = df['tissue'].unique()
+    df['unfreqent_number_of_neighbors'] = np.zeros(len(df), dtype=bool)
+    for tissue in tissues:
+        tissue_df = df[df['tissue'] == tissue]
+
+        num_neighbors = tissue_df['num_neighbors'].tolist()
+
+        values, counts = np.unique(num_neighbors, return_counts=True)
+        rel_frequencies = counts / len(num_neighbors)
+        unfreq_values = values[rel_frequencies < freq_threshold]
+
+        outliers_mask = np.logical_and(
+            df['tissue'] == tissue, np.isin(tissue_df['num_neighbors'], unfreq_values)
+        )
+        df['unfreqent_number_of_neighbors'] = np.logical_or(
+            df['unfreqent_number_of_neighbors'], outliers_mask
+        )
+
+    return df
+#------------------------------------------------------------------------------------------------------------
+
+
+
+#------------------------------------------------------------------------------------------------------------
 def detect_outliers(
     df: pd.DataFrame,
-    methods: Optional[Iterable[Literal['volume']]] = ('volume'),
+    methods: Optional[Iterable[Literal['volume', 'num_neighbors']]] = ('volume', 'num_neighbors'),
     inplace: Optional[bool] = False,
     *args, 
     **kwargs,
@@ -257,7 +307,7 @@ def detect_outliers(
         df: (pd.DataFrame)
             The cell statistics dataframe to apply outliers detection to.
     
-        methods: (Optional[Iterable[str]], default='volume')
+        methods: (Optional[Iterable[Literal['volume', 'num_neighbors']]], default=('volume', 'num_neighbors'))
             An iterable storing the names of methods used for outlier detection.
         
         inplace: (Optional[bool], default=False)
@@ -273,6 +323,9 @@ def detect_outliers(
             which is set to `True` for outlying records.
 
     '''
+
+    ### HANDLE ARGS ###
+
     is_outlier = np.zeros(len(df))
 
     if 'volume' in methods:
@@ -281,11 +334,14 @@ def detect_outliers(
             volume_outliers_df['is_small_cell'], 
             volume_outliers_df['is_large_cell']
         )
+        is_outlier = np.logical_or(is_outlier, is_outlier_vol)
+    elif 'num_neighbors' in methods:
+        num_neigh_outliers_df = num_neigh_outliers_df(df=df, *args, **kwargs)
+        is_outlier_num_neigh = num_neigh_outliers_df['unfreq_num_neighbors']
+        is_outlier = np.logical_or(is_outlier, is_outlier_num_neigh)
     else:
-        raise NotImplementedError()
+        NotImplementedError()
     
-    is_outlier = np.logical_or(is_outlier, is_outlier_vol)
-
     if inplace:
         df['is_outlier'] = is_outlier
         return 
