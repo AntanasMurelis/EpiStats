@@ -227,7 +227,7 @@ def _detect_volume_outliers(
 
         print(
         f'''\
-Found a total of {num_lower_outliers + num_upper_outliers} volume outliers in {tissue} sample,
+Found a total of {num_lower_outliers + num_upper_outliers} VOLUME outliers in {tissue} sample,
 of which:
     - Below lower bound: {num_lower_outliers},
     - Above upper bound: {num_upper_outliers}. 
@@ -268,7 +268,7 @@ def _detect_num_neighbors_outliers(
     """
 
     tissues = df['tissue'].unique()
-    df['unfreqent_number_of_neighbors'] = np.zeros(len(df), dtype=bool)
+    df['unfrequent_num_neighbors'] = np.zeros(len(df), dtype=bool)
     for tissue in tissues:
         tissue_df = df[df['tissue'] == tissue]
 
@@ -279,10 +279,18 @@ def _detect_num_neighbors_outliers(
         unfreq_values = values[rel_frequencies < freq_threshold]
 
         outliers_mask = np.logical_and(
-            df['tissue'] == tissue, np.isin(tissue_df['num_neighbors'], unfreq_values)
+            df['tissue'] == tissue, np.isin(df['num_neighbors'], unfreq_values)
         )
-        df['unfreqent_number_of_neighbors'] = np.logical_or(
-            df['unfreqent_number_of_neighbors'], outliers_mask
+        df['unfrequent_num_neighbors'] = np.logical_or(
+            df['unfrequent_num_neighbors'], outliers_mask
+        )
+
+        num_outliers = np.sum(outliers_mask, axis=0)
+        print(
+            f'''\
+Found low frequency NUMBER OF NEIGHBORS {unfreq_values} in {tissue} sample.
+Therefore, {num_outliers} records were marked as outliers.
+            '''
         )
 
     return df
@@ -293,7 +301,7 @@ def _detect_num_neighbors_outliers(
 #------------------------------------------------------------------------------------------------------------
 def detect_outliers(
     df: pd.DataFrame,
-    methods: Optional[Iterable[Literal['volume', 'num_neighbors']]] = ('volume', 'num_neighbors'),
+    methods: Optional[List[Literal['volume', 'num_neighbors']]] = ('volume', 'num_neighbors'),
     inplace: Optional[bool] = False,
     *args, 
     **kwargs,
@@ -307,7 +315,7 @@ def detect_outliers(
         df: (pd.DataFrame)
             The cell statistics dataframe to apply outliers detection to.
     
-        methods: (Optional[Iterable[Literal['volume', 'num_neighbors']]], default=('volume', 'num_neighbors'))
+        methods: (Optional[List[Literal['volume', 'num_neighbors']]], default=('volume', 'num_neighbors'))
             An iterable storing the names of methods used for outlier detection.
         
         inplace: (Optional[bool], default=False)
@@ -324,24 +332,42 @@ def detect_outliers(
 
     '''
 
+    avail_methods = ("volume", "num_neighbors")
+    for method in methods:
+        assert method in avail_methods, f"Selected method {method} is not available. Chose among {avail_methods}."
+    
     ### HANDLE ARGS ###
+    if "quantile_level" in kwargs:
+        quantile = kwargs["quantile_level"]
+    else:
+        quantile = 0.025
+    if "freq_threshold" in kwargs:
+        freq_thresh = kwargs["freq_threshold"]
+    else:
+        freq_thresh = 0.025
 
     is_outlier = np.zeros(len(df))
 
+    
     if 'volume' in methods:
-        volume_outliers_df = _detect_volume_outliers(df=df, *args, **kwargs)
+        print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+        print("Detecting VOLUME OUTLIERS\n")
+        volume_outliers_df = _detect_volume_outliers(df=df, quantile_level=quantile)
         is_outlier_vol = np.logical_or(
             volume_outliers_df['is_small_cell'], 
             volume_outliers_df['is_large_cell']
         )
         is_outlier = np.logical_or(is_outlier, is_outlier_vol)
-    elif 'num_neighbors' in methods:
-        num_neigh_outliers_df = num_neigh_outliers_df(df=df, *args, **kwargs)
-        is_outlier_num_neigh = num_neigh_outliers_df['unfreq_num_neighbors']
+        print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+        
+    if 'num_neighbors' in methods:
+        print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+        print("Detecting LOW FREQUENCY NUMBER OF NEIGHBORS\n")
+        num_neigh_outliers_df = _detect_num_neighbors_outliers(df=df, freq_threshold=freq_thresh)
+        is_outlier_num_neigh = num_neigh_outliers_df['unfrequent_num_neighbors']
         is_outlier = np.logical_or(is_outlier, is_outlier_num_neigh)
-    else:
-        NotImplementedError()
-    
+        print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+
     if inplace:
         df['is_outlier'] = is_outlier
         return 
@@ -642,11 +668,11 @@ def _get_lewis_law_2D_stats(
 
         # Reject unfrequent number of neighbors (if threshold is > 0)
         if freq_threshold > 0.0:
-            num_neigh_vals = np.asarray(tissue_2D_dict.keys())
+            num_neigh_vals = np.asarray(list(tissue_2D_dict.keys()))
             freqs = np.zeros(len(tissue_2D_dict.keys()))
             tot = 0
             for i, num_neigh in enumerate(num_neigh_vals):
-                freqs[i] = len(num_neigh)
+                freqs[i] = len(tissue_2D_dict[num_neigh])
                 tot += freqs[i]
             rel_freqs = freqs / tot
             to_remove = num_neigh_vals[rel_freqs < freq_threshold]
@@ -759,11 +785,11 @@ def _get_aboav_law_2D_stats(
         
         # Reject unfrequent number of neighbors (if threshold is > 0)
         if freq_threshold > 0.0:
-            num_neigh_vals = np.asarray(tissue_dict.keys())
+            num_neigh_vals = np.asarray(list(tissue_dict.keys()))
             freqs = np.zeros(len(tissue_dict.keys()))
             tot = 0
             for i, num_neigh in enumerate(num_neigh_vals):
-                freqs[i] = len(num_neigh)
+                freqs[i] = len(tissue_dict[num_neigh])
                 tot += freqs[i]
             rel_freqs = freqs / tot
             to_remove = num_neigh_vals[rel_freqs < freq_threshold]
