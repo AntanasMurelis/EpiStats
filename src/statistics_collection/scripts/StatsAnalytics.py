@@ -275,8 +275,9 @@ def _detect_num_neighbors_outliers(
         num_neighbors = tissue_df['num_neighbors'].tolist()
 
         values, counts = np.unique(num_neighbors, return_counts=True)
-        rel_frequencies = counts / len(num_neighbors)
-        unfreq_values = values[rel_frequencies < freq_threshold]
+        values, counts = values[1:], counts[1:] # neglect 0 neighbors cases
+        rel_frequencies = counts / sum(counts) 
+        unfreq_values = values[rel_frequencies < freq_threshold] 
 
         outliers_mask = np.logical_and(
             df['tissue'] == tissue, np.isin(df['num_neighbors'], unfreq_values)
@@ -288,7 +289,8 @@ def _detect_num_neighbors_outliers(
         num_outliers = np.sum(outliers_mask, axis=0)
         print(
             f'''\
-Found low frequency NUMBER OF NEIGHBORS {unfreq_values} in {tissue} sample.
+Found low frequency NUMBER OF NEIGHBORS {unfreq_values} in {tissue} sample,
+with frequencies respectively at {rel_frequencies[rel_frequencies < freq_threshold]}.
 Therefore, {num_outliers} records were marked as outliers.
             '''
         )

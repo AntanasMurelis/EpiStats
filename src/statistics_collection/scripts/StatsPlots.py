@@ -6,7 +6,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib.colors import ListedColormap
 from scipy import stats
-from scripts.StatsAnalytics import standardize, apply_PCA, extract_numerical, _exclude_outliers, _get_lewis_law_2D_stats, _get_aboav_law_2D_stats, _get_area_CV
+# from scripts.StatsAnalytics import standardize, apply_PCA, extract_numerical, _exclude_outliers, _get_lewis_law_2D_stats, _get_aboav_law_2D_stats, _get_area_CV
+from StatsAnalytics import standardize, apply_PCA, extract_numerical, _exclude_outliers, _get_lewis_law_2D_stats, _get_aboav_law_2D_stats, _get_area_CV
 from typing import Optional, List, Tuple, Iterable, Literal, Union
 
 
@@ -240,7 +241,7 @@ def pca_plots(
         labels=[
             f"{name.replace('_', ' ').title()}: {t_type.replace('_', ' ')}" 
             for name, t_type in zip(tissues, tissue_types)],
-        loc="upper right",
+        # loc="upper right",
         fontsize=18,
         markerscale=3
     )
@@ -345,6 +346,7 @@ def features_grid_kdplots(
 
             if column != 'num_neighbors':
                 # Map kernel density plot onto the axes, using shading and color
+                clip_vals = (0.0, lim_x) if column != "contact_area_fraction" else (0.0, 1.0)
                 sns.kdeplot(
                     data=tissue_df, 
                     x=column, 
@@ -352,7 +354,7 @@ def features_grid_kdplots(
                     color=colors[i], 
                     alpha=0.66,
                     ax=ax, 
-                    clip=(0.0, lim_x)
+                    clip=clip_vals
                 )
 
                 # Map rugplot to the axes, using height to adjust the size of the ticks
@@ -394,7 +396,7 @@ def features_grid_kdplots(
                 ax.set_xlabel(xlab, fontsize=22)
             else:
                 ax.set_xlabel("")
-                ax.set_xticks([])
+                # ax.set_xticks([])
             
             # Set y-axis stuff
             ax.set_ylabel("")
@@ -661,29 +663,29 @@ def lewis_law_plots(
         y_th_quadratic = (x_fit / 6)**2
 
         # Plot the values and the fitted lines
-        ax.errorbar(x, y, yerr=std_devs, fmt='o', color=colors[i], ecolor='grey', capsize=8, markersize=10)
+        ax.errorbar(x, y, yerr=std_devs, fmt='o', color=colors[i], ecolor='grey', capsize=8, markersize=14)
         coeffs = [round(coeff, 2) for coeff in coeff_sets[0]]
         ci_widths = [round(ci_width, 2) for ci_width in confint_width_sets[0]]
         linear, = ax.plot(
             x_fit, y_linear, 
-            color='red', linestyle='--', 
+            color='red', linestyle='--', lw=2,
             label=f'Linear fit, coeff: a={coeffs[1]}\u00B1{ci_widths[1]}, b={coeffs[0]}\u00B1{ci_widths[0]}'
         )
         coeffs = [round(coeff, 2) for coeff in coeff_sets[1]]  
         ci_widths = [round(ci_width, 2) for ci_width in confint_width_sets[1]]
         quadratic, = ax.plot(
             x_fit, y_quadratic, 
-            color='green', linestyle='-.', 
+            color='green', linestyle='-.', lw=2,
             label=f'Quadratic fit, coeff: a={coeffs[2]}\u00B1{ci_widths[2]}, b={coeffs[1]}\u00B1{ci_widths[1]}, c={coeffs[0]}\u00B1{ci_widths[0]}'
         )
         th_linear, = ax.plot(
             x_fit, y_th_linear,
-            color='orange', linestyle='--',
+            color='red', linestyle='--', lw=2,
             label=f"Theoretical linear fit"
         )
         th_quadratic, = ax.plot(
             x_fit, y_th_quadratic,
-            color='blue', linestyle='-.',
+            color='blue', linestyle='-.', lw=2,
             label=f"Theoretical quadratic fit"
         ) 
 
@@ -796,7 +798,7 @@ def lewis_law_2D_plots(
         df, principal_axis=(version=='principal')
     )
 
-    min_x, max_x = 2, 16
+    min_x, max_x = 2, 12
     max_y = 4.0
 
     fig = plt.figure(
@@ -835,30 +837,30 @@ def lewis_law_2D_plots(
         y_th_quadratic = (x_fit / 6)**2
 
         # Plot the values and the fitted lines
-        ax.errorbar(x, y_val, yerr=y_err, fmt='o', color=colors[i], ecolor='grey', capsize=8, markersize=10)
+        ax.errorbar(x, y_val, yerr=y_err, fmt='o', color=colors[i], ecolor='grey', capsize=8, markersize=14)
         if fit_degrees:
             coeffs = [round(coeff, 2) for coeff in coeff_sets[0]]
             ci_widths = [round(ci_width, 2) for ci_width in confint_width_sets[0]]
             linear, = ax.plot(
                 x_fit, y_linear, 
-                color='red', linestyle='--', 
+                color='red', linestyle='--', lw=2,
                 label=f'Linear fit, coeff: a={coeffs[1]}\u00B1{ci_widths[1]}, b={coeffs[0]}\u00B1{ci_widths[0]}'
             )
             coeffs = [round(coeff, 2) for coeff in coeff_sets[1]]  
             ci_widths = [round(ci_width, 2) for ci_width in confint_width_sets[1]]
             quadratic, = ax.plot(
                 x_fit, y_quadratic, 
-                color='green', linestyle='-.', 
+                color='green', linestyle='-.', lw=2,
                 label=f'Quadratic fit, coeff: a={coeffs[2]}\u00B1{ci_widths[2]}, b={coeffs[1]}\u00B1{ci_widths[1]}, c={coeffs[0]}\u00B1{ci_widths[0]}'
             )
         th_linear, = ax.plot(
             x_fit, y_th_linear,
-            color='orange', linestyle='--',
+            color='purple', linestyle='--', lw=2,
             label=f"Theoretical linear fit"
         )
         th_quadratic, = ax.plot(
             x_fit, y_th_quadratic,
-            color='blue', linestyle='-.',
+            color='blue', linestyle='-.', lw=2,
             label=f"Theoretical quadratic fit"
         ) 
 
@@ -1016,16 +1018,16 @@ def aboav_wearie_2D_plots(
         y_fit = polyline(x_fit)
 
         # Plot the values and the fitted lines
-        ax.errorbar(x, y_val, yerr=y_err, fmt='o', color=colors[i], ecolor='grey', capsize=8, markersize=10)
+        ax.errorbar(x, y_val, yerr=y_err, fmt='o', color=colors[i], ecolor='grey', capsize=8, markersize=14)
         theoretical, = ax.plot(
             x_fit, y_th, 
-            color='blue', linestyle='-.', 
+            color='blue', linestyle='-.', lw=2,
             label=f'Theoretical line'
         )
         if fitted:
             linear, = ax.plot(
                 x_fit, y_fit, 
-                color='red', linestyle='--', 
+                color='red', linestyle='--', lw=2,
                 label=f'Linear fit, coeff: a={round(coeff_set[1], 2)}, b={round(coeff_set[0], 2)}'
             )
 
