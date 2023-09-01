@@ -1,6 +1,6 @@
 {
-    "input_path": "/Volumes/iber/Projects/Early_Embryo/maoxia/movie_0608_3/curation/cell_boundary_time_21.tif",
-    "output_path": "/Volumes/iber/Projects/Early_Embryo/maoxia/movie_0608_3/stats",
+    "input_path": "/Volumes/iber/Projects/Early_Embryo/maoxia/movie_0608_2/curation/part_2_cell_boundary_time_10.tif",
+    "output_path": "/Volumes/iber/Projects/Early_Embryo/maoxia/movie_0608_2/stats",
     "tissue": "embryo",
     "erosion_iters": 2,
     "dilation_iters": 3,
@@ -9,7 +9,7 @@
     "num_2D_slices": 0,
     "size_2D_slices": 0,
     "mesh_format": "stl",
-    "max_workers": 4,
+    "max_workers": 1,
     "features": ["area", "volume", "principal_axis_and_elongation", "neighbors", "contact_area"],
     "load_from_cache": false
 }

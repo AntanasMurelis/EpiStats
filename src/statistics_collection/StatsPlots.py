@@ -542,8 +542,8 @@ def num_neighbors_barplots(
         # ax.set_xticklabels(np.arange(1, max_x))
         ax.set_ylabel('Frequency', fontsize=16)
         ax.text(
-            x=3, 
-            y=0.3, 
+            x=2, 
+            y=0.4, 
             s=(
                 f'Average: {round(avg_num_neighbors, 2)}'
                 '\n'
