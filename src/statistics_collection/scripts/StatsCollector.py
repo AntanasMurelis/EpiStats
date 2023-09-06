@@ -348,10 +348,23 @@ class StatsCollector:
         #compute number of neighbors in 2D slices
         if '2D_statistics' in self.features:
             self.df["num_neighbors_2D"] = self.df['neighbors_2D'].apply(lambda x: [len(l) for l in x])
+            neighbors_changes = []
+            for num_neighbors_lst in self.df["num_neighbors_2D"]:
+                neighbors_changes.append(
+                    np.sum(
+                        (num_neighbors_lst.values[1:] - num_neighbors_lst.values[:-1]).astype(bool) 
+                ))
+            self.df["num_neighbors_changes_2D"] = neighbors_changes
 
         if '2D_statistics_apical_basal' in self.features:
             self.df["num_neighbors_2D_principal"] = self.df['neighbors_2D_principal'].apply(lambda x: [len(l) for l in x])
-
+            neighbors_changes = []
+            for num_neighbors_lst in self.df["num_neighbors_2D_principal"]:
+                neighbors_changes.append(
+                    np.sum(
+                        (num_neighbors_lst.values[1:] - num_neighbors_lst.values[:-1]).astype(bool) 
+                ))
+            self.df["num_neighbors_changes_2D_principal"] = neighbors_changes
 
     def collect_statistics(
             self,
