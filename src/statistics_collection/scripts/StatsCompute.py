@@ -8,7 +8,7 @@ from tqdm import tqdm
 from collections import defaultdict
 from typing import Optional, List, Tuple, Iterable, Dict, Union
 import napari
-from typing import Union, Optional, Iterable, List, Tuple
+from typing import Union, Optional, Iterable, List, Tuple, Literal
 from morphosamplers.sampler import (
     generate_2d_grid,
     place_sampling_grids,
@@ -408,17 +408,20 @@ def _compute_2D_neighbors(
     
     Parameters:
     -----------
-    labeled_slice: (np.ndarray[int])
-        A 2D array of integer labels.
-    exclude_labels: (Iterable[int])
-        A list of labels to exclude from computation (e.g., not valid cells).
-    label_ids: (Optional[np.ndarray[int]] = [])
-        The pre-computed label ids present in the image (to speed up computation).
+        labeled_slice: (np.ndarray[int])
+            A 2D array of integer labels.
+
+        exclude_labels: (Iterable[int])
+            A list of labels to exclude from computation (e.g., not valid cells).
+            
+        label_ids: (Optional[np.ndarray[int]] = [])
+            The pre-computed label ids present in the image (to speed up computation).
 
     Returns:
     --------
-    neighbors_dict: (Dict[int, List[int]])
-        A dictionary that associates to each label a list of valid neighbors
+        neighbors_dict: (Dict[int, List[int]])
+            A dictionary that associates to each label a list of valid neighbors for the 
+            given 2D slice.
     """
 
     if len(label_ids) == 0:
@@ -455,12 +458,40 @@ def _compute_2D_neighbors(
 #------------------------------------------------------------------------------------------------------------
 def compute_2D_statistics(
         labeled_img: np.ndarray[int],
-        slicing_dim: int,
+        slicing_dim: Literal[0, 1, 2],
         exclude_labels: Iterable[int],
         pixel_size: Iterable[float]
 ) -> Dict[int, Tuple[List[float], List[List[int]]]]:
     """
     Compute 2D cell area and neigbors along one of X, Y, Z axes.
+
+    Parameters:
+    -----------
+        labeled_img: (np.ndarray[int])
+            The 3D labeled image representing the segmented cell tissue.
+
+        slicing_dim: (Literal[0, 1, 2])
+            The dimension along which orthogonal slices are taken (0 -> x, 1 -> y, 2 -> z).
+            
+        exclude_labels: (Iterable[int])
+            A list of cell labels to exclude from the computation.
+            
+        pixel_size: (Iterable[float])
+            The size of pixels in the 2D labeled slices.
+
+    Returns:
+    --------
+        neighbors_2D_dict: (Dict[int, List[List[int]]])
+            A dictionary in which each key is a cell id and the correspondent value is a list of
+            lists of neighboring cell ids. Specifically each sublist of neighbor ids is associated 
+            to a 2D slice.
+
+        area_2D_dict: (Dict[int, List[float]])
+            A dictionary in which each key is a cell id and the correspondent value is a list of
+            the cell area values for each one of the 2D slices.
+
+        slices_dict: (Dict[int, List[int]])
+            A dictionary whose keys are cell_ids and values are lists of slice ids. 
     """
 
     # Change axis order putting the slicing axis first    
