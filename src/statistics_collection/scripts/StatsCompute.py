@@ -18,10 +18,10 @@ from morphosamplers.sampler import (
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 from ExtendedTrimesh import ExtendedTrimesh
 from utils import (
-    _get_centroid_and_length, 
-    _get_rotation, 
-    _get_principal_axis, 
-    _get_slices_along_direction, 
+    get_centroid_and_length, 
+    get_rotation, 
+    get_principal_axis, 
+    get_slices_along_direction, 
     find_closest
 )
 
@@ -653,7 +653,7 @@ def _compute_neighbors_of_neighbors_along_direction(
         # get intersection between grid of main cell and points of neighbor principal axis
         neigh_center = find_closest(grid_coords, neigh_principal_pts, 20)
         # place grid and sample slice for neighbor
-        neigh_rot = _get_rotation(neigh_principal_vector)
+        neigh_rot = get_rotation(neigh_principal_vector)
         neigh_placed_grid = place_sampling_grids(grid_to_place, neigh_center, neigh_rot)
         neigh_sampled_slice = sample_volume_at_coordinates(
             labeled_img,
@@ -721,14 +721,14 @@ def compute_2D_statistics_along_axes(
             # Compute principal axis, axis length, centroid coordinates, and sequence of points
             # along the principal axis direction 
             cell_mesh = cell_mesh_dict[label_id]
-            principal_axis = _get_principal_axis(
+            principal_axis = get_principal_axis(
                 mesh=cell_mesh,
                 scale=voxel_size
             )
             cell_principal_axes[label_id] = principal_axis
 
             binary_img = (labeled_img == label_id).astype(np.uint8)
-            cell_centroid, cell_length = _get_centroid_and_length(binary_img)
+            cell_centroid, cell_length = get_centroid_and_length(binary_img)
             cell_length = int(cell_length // 2)
             cell_centroids[label_id] = cell_centroid
             cell_lengths[label_id] = cell_length
@@ -753,7 +753,7 @@ def compute_2D_statistics_along_axes(
             slices_dict[label_id] = ()
         else:
             # Get slices along principal axis direction
-            labeled_slices, grid_coords, new_voxel_size, slices_specs = _get_slices_along_direction(
+            labeled_slices, grid_coords, new_voxel_size, slices_specs = get_slices_along_direction(
                 labeled_img=labeled_img,
                 slicing_dir=cell_principal_axes[label_id],
                 centroid=cell_centroids[label_id],
