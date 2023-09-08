@@ -114,15 +114,15 @@ def get_cell_neighbors(
 if __name__ == "__main__":
     
     ### SET PATHS ###
-    common_root_dir = "/nas/groups/iber/Users/Federico_Carrara/"
+    ROOT_DIR = ""
     path_to_stats_df = os.path.join(
-        common_root_dir, "Statistics_Collection/outputs/outputs_v4/output_lung_pseudostratified_from_harold_s_10_e_6_d_8/cell_stats/stats_dataset_lung.csv"
+        ROOT_DIR, "/relative/path/to/stats/df.csv"
     )
     path_to_meshes_source_dir = os.path.join(
-        common_root_dir, "Statistics_Collection/outputs/outputs_v4/output_lung_pseudostratified_from_harold_s_10_e_6_d_8/cell_meshes/"
+        ROOT_DIR, "/relative/path/to/cell/meshes/source/dir/"
     )
     path_to_meshes_dest_dir = os.path.join(
-        common_root_dir, "FoldingNet_project/data/CellsData/cell_meshes/lung"
+        ROOT_DIR, "/relative/path/to/cell/meshes/destination/dir/"
     )
     ##################
 

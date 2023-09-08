@@ -1149,15 +1149,23 @@ def main():
     
     Please ensure that the path to label is preprocessed (perform erosion/dilation/removal of detached regions etc...)
     
-    Obtain the labels for a geometry using paraview: see ___ for a tutorial. If you do not have meshes generated (such as from statistics algorithms, you can)
+    Obtain the labels for a geometry using paraview: see ___ for a tutorial. If you do not have meshes generated 
+    (such as from statistics algorithms, you can)
 
     Example usage:
     ```python
     voxel_resolution = np.array([0.21, 0.21, 0.39])
     label_path = '/path/to/processed_labels.npy'
-    label_list = [111, 112, 114, 125, 126, 129, 134, 137, 139, 140, 143, 145, 152, 154, 167, 168, 169, 171, 172, 209, 88, 91] # Use string_to_array if you have a space separated string
+    label_list = [111, 112, 114, 125, 126, 129, 134, 137, 139, 140, 143] # Use string_to_array if you have a space separated string
     output_dir = '/path/to/output/Experiment_20_condensed'
-    mesh_process_clean(label_path=label_path, output_dir=output_dir, label_list=label_list, voxel_resolution=voxel_resolution, scale_factor=1e-6, make_shell=True)
+    mesh_process_clean(
+        label_path=label_path, 
+        output_dir=output_dir, 
+        label_list=label_list, 
+        voxel_resolution=voxel_resolution, 
+        scale_factor=1e-6, 
+        make_shell=True
+    )
     ```
     """
 
