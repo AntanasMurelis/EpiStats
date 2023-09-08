@@ -562,6 +562,7 @@ def _compute_2D_neighbors_along_direction(
 
     Returns:
     --------
+
     neighbors_dict: (Dict[int, List[int]])
         A dictionary that associates to each label a list of valid neighbors
     """
@@ -604,8 +605,8 @@ def _compute_neighbors_of_neighbors_along_direction(
         grid_to_place: np.ndarray[float]
 ) -> List[int]:
     """
-    Given a 2D array of integer labels, and a list of neighbors (related to the 'main' cell in the slice),
-    compute the number of neighbors for each of the neigbors.
+    Compute the number of neighbors for each of the neigbors related to the 'main' cell in the 
+    current slice.
 
     ALGORITHM:
     For each neighbor:
@@ -619,8 +620,8 @@ def _compute_neighbors_of_neighbors_along_direction(
     Parameters:
     -----------
 
-    labeled_slice: (np.ndarray[int])
-        A 2D array of integer labels related to the 'main' cell for which the function was called.
+    labeled_img: (np.ndarray[int])
+        The 3D labeled image representing the segmented cell tissue.
 
     neighbors: Iterable[int],
         A collection of neighbors related to the 'main' cell for which the function was called.
@@ -693,12 +694,48 @@ def compute_2D_statistics_along_axes(
 
     Parameters:
     -----------
+        labeled_img: (np.ndarray[int])
+            The 3D labeled image representing the segmented cell tissue.
 
+        cell_mesh_dict: (Dict[int, tm.base.Trimesh])
+            A dictionary that associated to cell ids (keys), a trimesh cell mesh (values).
 
+        exclude_labels: (Iterable[int])
+            A list of cell labels to exclude from the computation.
+            
+        voxel_size: (Iterable[float])
+            The size of voxels in the labeled image.
+
+        number_slices: (int = 10)
+            The number of slices to take along the apical-basal axis for each cell in the image.
+
+        slice_size: (int = 200)
+            The number of points considered for each side of the grid used for sampling slices along
+            the apical-basal axis.
+
+        remove_empty: (Optional[bool] = True)
+            If `True`, emppty values are removed from the results, in order to reduce the size of the 
+            returned data structure.
 
     Returns:
     --------
+        neighbors_dict: (Dict[int, List[List[int]]])
+            A dictionary in which each key is a cell id and the correspondent value is a list of
+            list of neighboring cell ids. Specifically each sublist of neighbor ids is associated 
+            to a 2D slice.
 
+        areas_dict: (Dict[int, List[float]])
+            A dictionary in which each key is a cell id and the correspondent value is a list of
+            the cell area values for each one of the 2D slices.
+         
+        neighbors_of_neighbors_dict: (Dict[int, Dict[int, List[int]]]) 
+            A dictionary in which each key is a cell id and the correspondent value is another
+            dictionary. The latter's keys are the numbers of neighbors found for the previously
+            mentioned cell id, while its values are lists of number of neighbors of neighbors. 
+
+        slices_dict: (Dict[int, Tuple[List[List[float]], List[float]]]])
+            A dictionary containing data to reconstruct the 2D sampling grids for each cell id
+            (mainly useful for debugging).
     """
     
     if np.any(slice_size > np.asarray(labeled_img.shape)):
