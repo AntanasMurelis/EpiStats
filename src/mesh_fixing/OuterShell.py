@@ -2,7 +2,6 @@ import os
 import trimesh
 import numpy as np
 import open3d as o3d
-import math
 from tqdm import tqdm
 from scipy.spatial import KDTree
 from typing import List, Optional, Type, Literal, Dict
