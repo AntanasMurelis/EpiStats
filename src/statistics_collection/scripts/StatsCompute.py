@@ -1,23 +1,23 @@
+import os
+import sys
 import numpy as np
-import pandas as pd
 import trimesh as tm
 import concurrent.futures
 from scipy import ndimage
 from tqdm import tqdm
-from skimage.measure import mesh_surface_area
 from collections import defaultdict
 from typing import Optional, List, Tuple, Iterable, Dict, Union
 import napari
-from scipy.spatial.transform import Rotation
 from typing import Union, Optional, Iterable, List, Tuple
 from morphosamplers.sampler import (
     generate_2d_grid,
     place_sampling_grids,
     sample_volume_at_coordinates,
 )
-from skimage.measure import regionprops
-from scripts.ExtendedTrimesh import ExtendedTrimesh
-from scripts.utils import (
+
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+from ExtendedTrimesh import ExtendedTrimesh
+from utils import (
     _get_centroid_and_length, 
     _get_rotation, 
     _get_principal_axis, 
