@@ -683,7 +683,7 @@ def _compute_neighbors_of_neighbors_along_direction(
         neigh_principal_pts = principal_axis_pts[neighbor]
         neigh_principal_vector = principal_axes[neighbor]
         # get intersection between grid of main cell and points of neighbor principal axis
-        neigh_center = find_closest(grid_coords, neigh_principal_pts, 20)
+        neigh_center = find_closest(grid_coords, neigh_principal_pts)
         # place grid and sample slice for neighbor
         neigh_rot = get_rotation(neigh_principal_vector)
         neigh_placed_grid = place_sampling_grids(grid_to_place, neigh_center, neigh_rot)
