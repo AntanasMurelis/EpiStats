@@ -2,6 +2,7 @@ import os
 import json
 import numpy as np
 from skimage import io
+from scipy.spatial import kdtree
 from scipy.spatial.distance import euclidean
 from scipy.spatial.transform import Rotation
 from skimage.measure import regionprops
@@ -109,41 +110,46 @@ def read_config(path):
 
 
 #------------------------------------------------------------------------------------------------------------
-def find_closest(points_cloud1, points_cloud2, lower_threshold):
-    # Iterate through all combinations of points
-    min_dist = float("inf")
-    closest_points = None, None
-    found = False
-    midpoint = points_cloud1.shape[0]//2
-    for i in range(midpoint):
-        for j in range(points_cloud2.shape[0]):
-            point1, point2 = points_cloud1[midpoint+i, :], points_cloud2[j, :]
-            distance = euclidean(point1, point2)
-            if distance < lower_threshold:
-                closest_points = point1, point2
-                found = True
-                break
-            if distance < min_dist:
-                closest_points = point1, point2
-                min_dist = distance
-            point1 = points_cloud1[midpoint-i, :]
-            distance = euclidean(point1, point2)
-            if distance < lower_threshold:
-                closest_points = point1, point2
-                found = True
-                break
-            if distance < min_dist:
-                closest_points = point1, point2
-                min_dist = distance
-        if found: break
+def find_closest(
+        point_cloud1: np.ndarray,
+        point_cloud2: np.ndarray,
+) -> np.ndarray:
+    """
+    Given two 3D pointclouds, find the closest pair of points, each one belonging to one 
+    of the two point clouds. Then, return the midpoint among the pair.
     
-    return sum(closest_points) / 2
+    Parameters:
+    -----------
+        points_cloud1: (np.ndarray)
+            A (M, 3) array, whose rows are the coordinates of the M points in the point cloud.
+
+        points_cloud2: (np.ndarray)
+            A (N, 3) array, whose rows are the coordinates of the N points in the point cloud.
+
+    Returns:
+    --------
+        (np.ndarray):
+            The midpoint among the pair of closest points, each one belonging to one 
+            of the two point clouds.
+    """
+    
+    # Calculate the pairwise Euclidean distances between all points in the two clouds
+    distances = np.sqrt(((point_cloud1[:, np.newaxis] - point_cloud2) ** 2).sum(axis=-1))
+
+    # Find the minimum distance and the indices of the closest pair of points
+    min_indices = np.unravel_index(np.argmin(distances), distances.shape)
+
+    # Get the closest pair of points
+    closest_point1 = point_cloud1[min_indices[0]]
+    closest_point2 = point_cloud2[min_indices[1]]
+    
+    return (closest_point1 + closest_point2) / 2
 #------------------------------------------------------------------------------------------------------------
 
 
 
 #------------------------------------------------------------------------------------------------------------
-def _get_centroid_and_length(
+def get_centroid_and_length(
         binary_img: np.ndarray[int]
 ) -> Tuple[np.ndarray[float], float]:
     """
@@ -162,6 +168,7 @@ def _get_centroid_and_length(
         length: (float)
             The length of the major axis of the object in the binary image.
     """ 
+
     props = regionprops(binary_img)[0]
     centroid = props.centroid
     _, _, min_z, _, _, max_z = props.bbox
@@ -173,7 +180,7 @@ def _get_centroid_and_length(
 
 
 #------------------------------------------------------------------------------------------------------------
-def _get_slices_along_direction(
+def get_slices_along_direction(
     labeled_img: np.ndarray[int],
     slicing_dir: Iterable[float],
     centroid: Iterable[float],
@@ -239,7 +246,7 @@ def _get_slices_along_direction(
     ]
 
     # Compute the rotation matrix
-    rot = _get_rotation(slicing_dir)
+    rot = get_rotation(slicing_dir)
     
     # Compute the voxel sizes in the new coordinate system
     new_axes_directions = rot[0].as_matrix() # (X, Y, Z as column vectors, Z is the principal axis)
@@ -276,7 +283,7 @@ def _get_slices_along_direction(
 
 
 #------------------------------------------------------------------------------------------------------------
-def _get_principal_axis(
+def get_principal_axis(
         mesh: tm.base.Trimesh,
 		scale: Iterable[float],
 ) -> np.ndarray[float]:
@@ -317,7 +324,7 @@ def _get_principal_axis(
 
 
 #------------------------------------------------------------------------------------------------------------
-def _get_rotation(
+def get_rotation(
         principal_vector: np.ndarray
     ) -> Rotation:
     """
