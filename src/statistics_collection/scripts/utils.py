@@ -1,7 +1,7 @@
-import numpy as np
-from skimage import io
 import os
 import json
+import numpy as np
+from skimage import io
 from scipy.spatial.distance import euclidean
 from scipy.spatial.transform import Rotation
 from skimage.measure import regionprops

@@ -1,11 +1,14 @@
+import os
+import sys
 import numpy as np
 import pandas as pd
 import trimesh as tm
-import os
 import pickle
-from typing import Optional, List, Tuple, Iterable, Dict, Union, Callable
-from scripts.LabelPreprocessing import get_labels_touching_edges, get_labels_touching_background
-from scripts.StatsUtils import *
+from typing import Optional, List, Tuple, Iterable, Dict, Union
+
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+from LabelPreprocessing import get_labels_touching_edges, get_labels_touching_background
+from StatsCompute import *
 
 #--------------------------------------------------------------------------------------------------
 class StatsCollector:

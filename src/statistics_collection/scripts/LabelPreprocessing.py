@@ -1,15 +1,18 @@
-from typing import List, Optional, Tuple, Dict, Iterable
-import numpy as np
-from tqdm import tqdm
 import os
+import sys
+import numpy as np
 import warnings
-from skimage.io import imread, imsave
 import scipy.ndimage as ndimage
+import pyclesperanto_prototype as cle
+from tqdm import tqdm
+from skimage.io import imread, imsave
 from skimage.measure import regionprops
 from skimage.segmentation import relabel_sequential
-import pyclesperanto_prototype as cle
 from napari_process_points_and_surfaces import label_to_surface
-from scripts.utils import load_labeled_img, create_output_directory, custom_showwarning
+from typing import List, Optional, Tuple, Dict, Iterable
+
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+from utils import custom_showwarning
 
 
 #-----------------------------------------------------------------------------------------------------------------------------
