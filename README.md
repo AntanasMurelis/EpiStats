@@ -1,6 +1,6 @@
 # EpiStats: collection of morphological cell statistics from segmented 3D images of epithelial tissues
 
-This repository contains tools for computing and plotting morphological statistics of cells in 3D images of epithelial tissues. It also provides methods to transform the segmented cells into mesh files and to fix these meshes in case they present any issue.
+This repository contains tools for computing and analysing morphological statistics of cells in 3D images of epithelial tissues. It also provides methods to transform the segmented cells into mesh files and to fix these meshes in case they present any issues.
 
 <table border="0">
   <tr>
