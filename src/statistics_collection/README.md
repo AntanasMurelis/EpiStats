@@ -79,7 +79,7 @@ I will provide here some examples as a reference for possible time duration of s
 If you are dealing with a large sample you can:
 1. Set a longer reserved time for your jobs in `submit_jobs.py`:
    
-![check_path_2](https://github.com/AntanasMurelis/EpiStats/blob/dev_fede/images/info_run_collection_6.png)
+![check_path_2](https://github.com/AntanasMurelis/EpiStats/blob/main/images/info_run_collection_6.png)
 
 2. Reduce the number of slices along apical-basal axes (e.g. from 50 to 20)
 
