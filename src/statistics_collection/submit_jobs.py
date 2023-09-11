@@ -38,7 +38,7 @@ def create_slurm(
 
 #SBATCH -n 1
 #SBATCH --cpus-per-task={max_workers}
-#SBATCH --time=72:00:00
+#SBATCH --time=144:00:00
 #SBATCH --mem-per-cpu=16384
 
 python src/statistics_collection/run_collection.py --config {config_file}   
@@ -60,7 +60,9 @@ python src/statistics_collection/run_collection.py --config {config_file}
 with open("src/statistics_collection/config.json", "r") as file:
     curr_config = json.load(file)
 
-#Set ranges of parameters to modify in the config
+#Set parameters to modify in the config
+"""
+EXAMPLE:
 tissues = [
     'intestine_villus', 
     'lung_bronchiole', 
@@ -84,6 +86,15 @@ input_files = [
     'lung_pseudostratified_from_harold.tif'
 ]
 input_paths = [os.path.join(COMMON_ROOT, input_file) for input_file in input_files]
+"""
+
+tissues = ["tissue_name_1", "tissue_name_2", "tissue_name_3"]
+voxel_sizes = [[1, 1, 1], [1, 1, 1], [1, 1, 1]]
+input_paths = [
+    "path/to/segmented/image/tissue_1.tif",
+    "path/to/segmented/image/tissue_2.tif",
+    "path/to/segmented/image/tissue_3.tif"
+]
 
 #For each tissue create a new config file and a new job submit script
 for tissue, voxel_size, input_path in zip(tissues, voxel_sizes ,input_paths):

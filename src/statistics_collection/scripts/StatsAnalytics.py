@@ -7,7 +7,7 @@ from tqdm import tqdm
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from collections import defaultdict
-from typing import Optional, Iterable, Tuple, Union, Literal, Callable, Dict
+from typing import Optional, Iterable, Tuple, Union, Literal, Callable, Dict, List
 
 
 
@@ -196,7 +196,7 @@ def _detect_volume_outliers(
 
     Returns:
     --------
-    out_df: (pd.Dataframe)
+    (pd.Dataframe)
         The same dataframe as the one in input, except for additional
         boolean columns `is_small_cell` and `is_large_cell` that mark
         cells with outlying values of volume.
@@ -227,7 +227,7 @@ def _detect_volume_outliers(
 
         print(
         f'''\
-Found a total of {num_lower_outliers + num_upper_outliers} volume outliers in {tissue} sample,
+Found a total of {num_lower_outliers + num_upper_outliers} VOLUME outliers in {tissue} sample,
 of which:
     - Below lower bound: {num_lower_outliers},
     - Above upper bound: {num_upper_outliers}. 
@@ -241,9 +241,69 @@ of which:
 
 
 #------------------------------------------------------------------------------------------------------------
+def _detect_num_neighbors_outliers(
+        df: pd.DataFrame,
+        freq_threshold: Optional[float] = 0.025,
+) -> List[int]:
+    """
+    In the input cell statistics dataframe find the number of (3D) neighbors outliers, by excluding less 
+    frequent values, separately for each tissue.
+
+    Parameters:
+    -----------
+
+    df: (pd.DataFrame)
+        The cell statistics dataframe.
+
+    freq_threshold: (Optional[float] = 0.05)
+        Compute relative frequency of each number of neighbors. Values under this threshold are marked as outliers.
+
+    Returns:
+    --------
+
+    (pd.Dataframe)
+        The same dataframe as the one in input, except for additional
+        boolean columns `is_small_cell` and `is_large_cell` that mark
+        cells with outlying values of volume.
+    """
+
+    tissues = df['tissue'].unique()
+    df['unfrequent_num_neighbors'] = np.zeros(len(df), dtype=bool)
+    for tissue in tissues:
+        tissue_df = df[df['tissue'] == tissue]
+
+        num_neighbors = tissue_df['num_neighbors'].tolist()
+
+        values, counts = np.unique(num_neighbors, return_counts=True)
+        values, counts = values[1:], counts[1:] # neglect 0 neighbors cases
+        rel_frequencies = counts / sum(counts) 
+        unfreq_values = values[rel_frequencies < freq_threshold] 
+
+        outliers_mask = np.logical_and(
+            df['tissue'] == tissue, np.isin(df['num_neighbors'], unfreq_values)
+        )
+        df['unfrequent_num_neighbors'] = np.logical_or(
+            df['unfrequent_num_neighbors'], outliers_mask
+        )
+
+        num_outliers = np.sum(outliers_mask, axis=0)
+        print(
+            f'''\
+Found low frequency NUMBER OF NEIGHBORS {unfreq_values} in {tissue} sample,
+with frequencies respectively at {rel_frequencies[rel_frequencies < freq_threshold]}.
+Therefore, {num_outliers} records were marked as outliers.
+            '''
+        )
+
+    return df
+#------------------------------------------------------------------------------------------------------------
+
+
+
+#------------------------------------------------------------------------------------------------------------
 def detect_outliers(
     df: pd.DataFrame,
-    methods: Optional[Iterable[Literal['volume']]] = ('volume'),
+    methods: Optional[List[Literal['volume', 'num_neighbors']]] = ('volume', 'num_neighbors'),
     inplace: Optional[bool] = False,
     *args, 
     **kwargs,
@@ -257,7 +317,7 @@ def detect_outliers(
         df: (pd.DataFrame)
             The cell statistics dataframe to apply outliers detection to.
     
-        methods: (Optional[Iterable[str]], default='volume')
+        methods: (Optional[List[Literal['volume', 'num_neighbors']]], default=('volume', 'num_neighbors'))
             An iterable storing the names of methods used for outlier detection.
         
         inplace: (Optional[bool], default=False)
@@ -273,18 +333,42 @@ def detect_outliers(
             which is set to `True` for outlying records.
 
     '''
+
+    avail_methods = ("volume", "num_neighbors")
+    for method in methods:
+        assert method in avail_methods, f"Selected method {method} is not available. Chose among {avail_methods}."
+    
+    ### HANDLE ARGS ###
+    if "quantile_level" in kwargs:
+        quantile = kwargs["quantile_level"]
+    else:
+        quantile = 0.025
+    if "freq_threshold" in kwargs:
+        freq_thresh = kwargs["freq_threshold"]
+    else:
+        freq_thresh = 0.025
+
     is_outlier = np.zeros(len(df))
 
+    
     if 'volume' in methods:
-        volume_outliers_df = _detect_volume_outliers(df=df, *args, **kwargs)
+        print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+        print("Detecting VOLUME OUTLIERS\n")
+        volume_outliers_df = _detect_volume_outliers(df=df, quantile_level=quantile)
         is_outlier_vol = np.logical_or(
             volume_outliers_df['is_small_cell'], 
             volume_outliers_df['is_large_cell']
         )
-    else:
-        raise NotImplementedError()
-    
-    is_outlier = np.logical_or(is_outlier, is_outlier_vol)
+        is_outlier = np.logical_or(is_outlier, is_outlier_vol)
+        print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+        
+    if 'num_neighbors' in methods:
+        print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+        print("Detecting LOW FREQUENCY NUMBER OF NEIGHBORS\n")
+        num_neigh_outliers_df = _detect_num_neighbors_outliers(df=df, freq_threshold=freq_thresh)
+        is_outlier_num_neigh = num_neigh_outliers_df['unfrequent_num_neighbors']
+        is_outlier = np.logical_or(is_outlier, is_outlier_num_neigh)
+        print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
 
     if inplace:
         df['is_outlier'] = is_outlier
@@ -526,30 +610,37 @@ def apply_PCA(
 def _get_lewis_law_2D_stats(
     df: pd.DataFrame,
     num_neighbors_lower_threshold: Optional[int] = 3,
-    principal_axis: Optional[bool] = True
+    principal_axis: Optional[bool] = True,
+    freq_threshold: Optional[int] = 0.025
 ) -> Dict[str, Dict[int, Tuple[float, float]]]:
     '''
     Compute the statistics needed for checking 2D Lewis' Law.
 
     Parameters:
     -----------
-        df: (pd.DataFrame)
-            The dataframe to compute statistics from.
-        
-        num_neighbors_lower_threshold: (Optional[int], default=3)
-            The threshold under which a cell is excluded from computation.
-        
-        principal_axis (Optional[bool], default=True)
-            If True compute the lewis law statistics for the 2D statistics 
-            collected along cells' principal_axes.
+
+    df: (pd.DataFrame)
+        The dataframe to compute statistics from.
+    
+    num_neighbors_lower_threshold: (Optional[int], default=3)
+        The threshold under which a cell is excluded from computation.
+    
+    principal_axis (Optional[bool], default=True)
+        If True compute the lewis law statistics for the 2D statistics 
+        collected along cells' principal_axes.
+
+    freq_threshold: (Optional[float] = 0.05)
+        Values number of neighbors whose frequency is below this threshold
+        are excluded from computation.
 
     Returns:
     --------
-        lewis_law_dict: (Dict[str, Dict[int, Tuple[float, float]]])
-            A nested dictionary. The statistics computed for different tissues are
-            stored in different dictionaries, each associated to the correspondent tissue names key.
-            Each inner dictionary then has number of neighbors values as keys and tuples 
-            of normalized averages and standard errors as values.
+    
+    lewis_law_dict: (Dict[str, Dict[int, Tuple[float, float]]])
+        A nested dictionary. The statistics computed for different tissues are
+        stored in different dictionaries, each associated to the correspondent tissue names key.
+        Each inner dictionary then has number of neighbors values as keys and tuples 
+        of normalized averages and standard errors as values.
     '''
 
     if principal_axis:
@@ -576,6 +667,21 @@ def _get_lewis_law_2D_stats(
                         continue
                     else:
                         tissue_2D_dict[num_neigh].append(area)
+
+        # Reject unfrequent number of neighbors (if threshold is > 0)
+        if freq_threshold > 0.0:
+            num_neigh_vals = np.asarray(list(tissue_2D_dict.keys()))
+            freqs = np.zeros(len(tissue_2D_dict.keys()))
+            tot = 0
+            for i, num_neigh in enumerate(num_neigh_vals):
+                freqs[i] = len(tissue_2D_dict[num_neigh])
+                tot += freqs[i]
+            rel_freqs = freqs / tot
+            to_remove = num_neigh_vals[rel_freqs < freq_threshold]
+            for key in to_remove:
+                del tissue_2D_dict[key]
+            print(f"Tissue {tissue} -> rejected data for number of neighbors {to_remove} due to low occurrency.")
+
         stats_2D_dict[tissue] = tissue_2D_dict
     
     # Compute area averages
@@ -595,36 +701,43 @@ def _get_lewis_law_2D_stats(
 
 #------------------------------------------------------------------------------------------------------------
 def _get_aboav_law_2D_stats(
-        df: pd.DataFrame,
-        num_neighbors_lower_threshold: Optional[int] = 3,
-        principal_axis: Optional[bool] = True,
-        show_logs: Optional[bool] = False
+    df: pd.DataFrame,
+    num_neighbors_lower_threshold: Optional[int] = 3,
+    principal_axis: Optional[bool] = True,
+    freq_threshold: Optional[int] = 0.025,
+    show_logs: Optional[bool] = False
     ) -> Dict[str, Dict[int, float]]:
     '''
     Parameters:
     -----------
-        df: (pd.DataFrame)
-            The dataframe to compute statistics from.
-        
-        num_neighbors_lower_threshold: (Optional[int], default=3)
-            The threshold under which a cell is excluded from computation.
 
-        principal_axis (Optional[bool], default=True)
-            If True compute the lewis law statistics for the 2D statistics 
-            collected along cells' principal_axes.
-        
-        show_logs: (Optional[bool], deafult=False)
-            If true messages are print for debugging purpose.
+    df: (pd.DataFrame)
+        The dataframe to compute statistics from.
+    
+    num_neighbors_lower_threshold: (Optional[int], default=3)
+        The threshold under which a cell is excluded from computation.
+
+    principal_axis (Optional[bool], default=True)
+        If True compute the lewis law statistics for the 2D statistics 
+        collected along cells' principal_axes.
+
+    freq_threshold: (Optional[float] = 0.05)
+        Values number of neighbors whose frequency is below this threshold
+        are excluded from computation.
+    
+    show_logs: (Optional[bool], deafult=False)
+        If true messages are print for debugging purpose.
 
     Returns:
     --------
-        aboav_law_dict: (Dict[str, Dict[int, Tuple[float, float]]])
-                A nested dictionary. The statistics computed for different tissues are stored 
-                in different dictionaries, each associated to the correspondent tissue names key.
-                Each inner dictionary then has number of neighbors values as keys and tuples 
-                of normalized averages and standard errors as values.
     
+    aboav_law_dict: (Dict[str, Dict[int, Tuple[float, float]]])
+            A nested dictionary. The statistics computed for different tissues are stored 
+            in different dictionaries, each associated to the correspondent tissue names key.
+            Each inner dictionary then has number of neighbors values as keys and tuples 
+            of normalized averages and standard errors as values.
     '''
+
     tissues = df['tissue'].unique()
 
     aboav_law_dict = {}
@@ -671,6 +784,20 @@ def _get_aboav_law_2D_stats(
                                 tissue_dict[num_neighs] = tissue_dict[num_neighs] + others_num_neighs
                                 if show_logs:
                                     print(f'Current tissue_dict: {tissue_dict}')
+        
+        # Reject unfrequent number of neighbors (if threshold is > 0)
+        if freq_threshold > 0.0:
+            num_neigh_vals = np.asarray(list(tissue_dict.keys()))
+            freqs = np.zeros(len(tissue_dict.keys()))
+            tot = 0
+            for i, num_neigh in enumerate(num_neigh_vals):
+                freqs[i] = len(tissue_dict[num_neigh])
+                tot += freqs[i]
+            rel_freqs = freqs / tot
+            to_remove = num_neigh_vals[rel_freqs < freq_threshold]
+            for key in to_remove:
+                del tissue_dict[key]
+            print(f"Tissue {tissue} -> rejected data for number of neighbors {to_remove} due to low occurrency.")
 
         tissue_dict = dict(sorted(tissue_dict.items()))
         if show_logs:

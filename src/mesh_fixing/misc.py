@@ -6,8 +6,11 @@ import numpy as np
 from tqdm import tqdm
 from typing import List, Set
 
-sys.path.append('/nas/groups/iber/Users/Federico_Carrara/Statistics_Collection/EpiStats/src/statistics_collection/')
-from StatsAnalytics import prepare_df
+PROJECT_ROOT = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), os.pardir)
+)
+sys.path.append(PROJECT_ROOT)
+from statistics_collection.scripts.StatsAnalytics import prepare_df
 
 
 #---------------------------------------------------------------------------------------------------------------------
@@ -76,18 +79,50 @@ def copy_selected_meshes(
 #---------------------------------------------------------------------------------------------------------------------
 
 
+
+#---------------------------------------------------------------------------------------------------------------------
+def get_cell_neighbors(
+        path_to_stats_df: str,
+        cell_ids: List[int]
+) -> List[List[int]]:
+    """
+    Load the dataframe of cell statistics and, for each cell in cell_ids, extract its neighbors' ids list.
+
+    Parameters:
+    -----------
+    path_to_stats_df: (str)
+        The path to the statistics dataframe.
+    
+    cell_ids: (List[int])
+        A list of cell ids.
+
+    Returns:
+    --------
+    cell_neighbors_lst: (List[List[int]])
+        A list of neighbors' ids for each cell.
+    """
+
+    cell_stats_df = prepare_df([path_to_stats_df])
+    id_mask = np.isin(cell_stats_df["cell_ID"], cell_ids)
+    cell_neighbors_lst = cell_stats_df[id_mask]["neighbors"].tolist()
+
+    return cell_neighbors_lst
+#---------------------------------------------------------------------------------------------------------------------
+
+
+
 if __name__ == "__main__":
     
     ### SET PATHS ###
-    common_root_dir = "/nas/groups/iber/Users/Federico_Carrara/"
+    ROOT_DIR = ""
     path_to_stats_df = os.path.join(
-        common_root_dir, "Statistics_Collection/outputs/outputs_v4/output_lung_pseudostratified_from_harold_s_10_e_6_d_8/cell_stats/stats_dataset_lung.csv"
+        ROOT_DIR, "/relative/path/to/stats/df.csv"
     )
     path_to_meshes_source_dir = os.path.join(
-        common_root_dir, "Statistics_Collection/outputs/outputs_v4/output_lung_pseudostratified_from_harold_s_10_e_6_d_8/cell_meshes/"
+        ROOT_DIR, "/relative/path/to/cell/meshes/source/dir/"
     )
     path_to_meshes_dest_dir = os.path.join(
-        common_root_dir, "FoldingNet_project/data/CellsData/cell_meshes/lung"
+        ROOT_DIR, "/relative/path/to/cell/meshes/destination/dir/"
     )
     ##################
 

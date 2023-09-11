@@ -1,27 +1,27 @@
+import os
+import sys
 import numpy as np
-import pandas as pd
 import trimesh as tm
 import concurrent.futures
 from scipy import ndimage
 from tqdm import tqdm
-from skimage.measure import mesh_surface_area
 from collections import defaultdict
 from typing import Optional, List, Tuple, Iterable, Dict, Union
-from ExtendedTrimesh import ExtendedTrimesh
 import napari
-from scipy.spatial.transform import Rotation
-from typing import Union, Optional, Iterable, List, Tuple
+from typing import Union, Optional, Iterable, List, Tuple, Literal
 from morphosamplers.sampler import (
     generate_2d_grid,
     place_sampling_grids,
     sample_volume_at_coordinates,
 )
-from skimage.measure import regionprops
-from misc import (
-    _get_centroid_and_length, 
-    _get_rotation, 
-    _get_principal_axis, 
-    _get_slices_along_direction, 
+
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+from ExtendedTrimesh import ExtendedTrimesh
+from utils import (
+    get_centroid_and_length, 
+    get_rotation, 
+    get_principal_axis, 
+    get_slices_along_direction, 
     find_closest
 )
 
@@ -401,8 +401,31 @@ def _compute_2D_area(
 def _compute_2D_neighbors(
         labeled_slice: np.ndarray[int], 
         exclude_labels: Iterable[int],
-        label_ids: np.ndarray[int]
+        label_ids: Optional[np.ndarray[int]] = []
 ) -> Dict[int, List[int]]:
+    """
+    Given a 2D array of integer labels, compute the neighbors of each label.
+    
+    Parameters:
+    -----------
+        labeled_slice: (np.ndarray[int])
+            A 2D array of integer labels.
+
+        exclude_labels: (Iterable[int])
+            A list of labels to exclude from computation (e.g., not valid cells).
+            
+        label_ids: (Optional[np.ndarray[int]] = [])
+            The pre-computed label ids present in the image (to speed up computation).
+
+    Returns:
+    --------
+        neighbors_dict: (Dict[int, List[int]])
+            A dictionary that associates to each label a list of valid neighbors for the 
+            given 2D slice.
+    """
+
+    if len(label_ids) == 0:
+        label_ids, _ = np.unique(labeled_slice)
     
     neighbors_dict = {}
     for label in label_ids[1:]:
@@ -435,10 +458,41 @@ def _compute_2D_neighbors(
 #------------------------------------------------------------------------------------------------------------
 def compute_2D_statistics(
         labeled_img: np.ndarray[int],
-        slicing_dim: int,
+        slicing_dim: Literal[0, 1, 2],
         exclude_labels: Iterable[int],
         pixel_size: Iterable[float]
 ) -> Dict[int, Tuple[List[float], List[List[int]]]]:
+    """
+    Compute 2D cell area and neigbors along one of X, Y, Z axes.
+
+    Parameters:
+    -----------
+        labeled_img: (np.ndarray[int])
+            The 3D labeled image representing the segmented cell tissue.
+
+        slicing_dim: (Literal[0, 1, 2])
+            The dimension along which orthogonal slices are taken (0 -> x, 1 -> y, 2 -> z).
+            
+        exclude_labels: (Iterable[int])
+            A list of cell labels to exclude from the computation.
+            
+        pixel_size: (Iterable[float])
+            The size of pixels in the 2D labeled slices.
+
+    Returns:
+    --------
+        neighbors_2D_dict: (Dict[int, List[List[int]]])
+            A dictionary in which each key is a cell id and the correspondent value is a list of
+            lists of neighboring cell ids. Specifically each sublist of neighbor ids is associated 
+            to a 2D slice.
+
+        area_2D_dict: (Dict[int, List[float]])
+            A dictionary in which each key is a cell id and the correspondent value is a list of
+            the cell area values for each one of the 2D slices.
+
+        slices_dict: (Dict[int, List[int]])
+            A dictionary whose keys are cell_ids and values are lists of slice ids. 
+    """
 
     # Change axis order putting the slicing axis first    
     if slicing_dim == 0:
@@ -487,15 +541,30 @@ def _compute_2D_area_along_direction(
 		cell_label: np.ndarray[int],
 		pixel_size: Iterable[float]
 ) -> float:
+    """
+    Given a 2D array of integer labels and a cell label, compute its area.
+
+    Parameters:
+    -----------
+
+    labeled_slice: (np.ndarray[int])
+        A 2D array of integer labels.
+
+    cell_label: int
+        The cell whose neighbors are computed.
+
+    pixel_size: (Iterable[float])
+        The pixel size for the current slice.
+    """
 	
-	binary_slice = (labeled_slice == cell_label).astype(np.uint16)
-	if np.any(binary_slice):
-		pixel_count = np.sum(binary_slice)
-		pixel_area = pixel_size[0] * pixel_size[1]
-		area = pixel_count * pixel_area
-		return area
-	else:
-		return 0.0
+    binary_slice = (labeled_slice == cell_label).astype(np.uint16)
+    if np.any(binary_slice):
+        pixel_count = np.sum(binary_slice)
+        pixel_area = pixel_size[0] * pixel_size[1]
+        area = pixel_count * pixel_area
+        return area
+    else:
+        return 0.0
 #------------------------------------------------------------------------------------------------------------
 
 
@@ -503,34 +572,56 @@ def _compute_2D_area_along_direction(
 #------------------------------------------------------------------------------------------------------------
 def _compute_2D_neighbors_along_direction(
         labeled_slice: np.ndarray[int], 
-        cell_label: np.ndarray[int],
+        cell_label: int,
         background_threshold: float = 0.1
 ) -> List[int]:
+    """
+    Given a 2D array of integer labels and a cell label, compute the neighbors for that cell.
+    
+    Parameters:
+    -----------
+
+    labeled_slice: (np.ndarray[int])
+        A 2D array of integer labels.
+
+    cell_label: int
+        The cell whose neighbors are computed.
+    
+    background_threshold: (float = 0.1)
+        If the cell is in contact with the background for more than `background_threshold` * cell perimeter
+        the cell is considered not valid and [-1] is returned.
+
+    Returns:
+    --------
+
+    neighbors_dict: (Dict[int, List[int]])
+        A dictionary that associates to each label a list of valid neighbors
+    """
 
 	#Get the pixels of the cell
-	binary_slice = labeled_slice == cell_label
+    binary_slice = labeled_slice == cell_label
 
-	# Check if cell is present in the slice
-	if not np.any(binary_slice):
-		return [-1]
+    # Check if cell is present in the slice
+    if not np.any(binary_slice):
+        return [-1]
 
-	#Expand the volume of the cell by 2 voxels in each direction
-	expanded_cell_voxels = ndimage.binary_dilation(binary_slice, iterations=2)
-		
-	#Find the voxels that are directly in contact with the surface of the cell
-	cell_surface_voxels = expanded_cell_voxels ^ binary_slice
+    #Expand the volume of the cell by 2 voxels in each direction
+    expanded_cell_voxels = ndimage.binary_dilation(binary_slice, iterations=2)
+        
+    #Find the voxels that are directly in contact with the surface of the cell
+    cell_surface_voxels = expanded_cell_voxels ^ binary_slice
 
-	#Get the labels of the neighbors
-	neighbors, counts = np.unique(labeled_slice[cell_surface_voxels], return_counts=True)
+    #Get the labels of the neighbors
+    neighbors, counts = np.unique(labeled_slice[cell_surface_voxels], return_counts=True)
 
-	#Check if the label is touching the background above a certain threshold
-	# print(f'Cell {cell_label}: {neighbors}, {counts}')
-	if (0 in neighbors) and (counts[0] > np.sum(counts) * background_threshold):
-		return [-1]
-	else:
-		#Remove the label of the cell itself, and the label of the background from the neighbors list
-		neighbors = neighbors[(neighbors != cell_label) & (neighbors != 0)]
-		return list(neighbors)
+    #Check if the label is touching the background above a certain threshold
+    # print(f'Cell {cell_label}: {neighbors}, {counts}')
+    if (0 in neighbors) and (counts[0] > np.sum(counts) * background_threshold):
+        return [-1]
+    else:
+        #Remove the label of the cell itself, and the label of the background from the neighbors list
+        neighbors = neighbors[(neighbors != cell_label) & (neighbors != 0)]
+        return list(neighbors)
 #------------------------------------------------------------------------------------------------------------
 
 
@@ -544,6 +635,46 @@ def _compute_neighbors_of_neighbors_along_direction(
         principal_axis_pts: Dict[int, np.ndarray[float]],
         grid_to_place: np.ndarray[float]
 ) -> List[int]:
+    """
+    Compute the number of neighbors for each of the neigbors related to the 'main' cell in the 
+    current slice.
+
+    ALGORITHM:
+    For each neighbor:
+        - Get its principal axis and sample points on it (pre-computed in this case).
+        - Find the intersection between the labeled slice (associated to the 'main' cell) in the and the neighbor's 
+          principal axis.
+        - Generate a grid of points whose center is the aforementioned intersection and normal the neighbor's principal axis.
+        - Sample a new slice for this grid, now associated to the neighbor.
+        - Compute neighbor's neighbors on this labeled slice 
+    
+    Parameters:
+    -----------
+
+    labeled_img: (np.ndarray[int])
+        The 3D labeled image representing the segmented cell tissue.
+
+    neighbors: Iterable[int],
+        A collection of neighbors related to the 'main' cell for which the function was called.
+    
+    grid_coords: np.ndarray[float]
+        A grid of coordinates related to the 'main' cell for which the function was called.
+    
+    principal_axes: Dict[int, np.ndarray[float]]
+        A dictionary storing cell indexes and their principal axes as vectors.
+    
+    principal_axis_pts: Dict[int, np.ndarray[float]]
+        A dictionary storing cell indexes and arrays of points sampled on principal axes.
+    
+    grid_to_place: np.ndarray[float]
+        A new grid to place for each neighbor.
+    
+    Returns:
+    --------
+
+    neigh_num_neighbors: (List[int])
+        A list of number of neighbors for each of the neighbors provided as input.    
+    """
 
     # iterate over neighbors from a slice to compute neighbors of neighbors
     neigh_num_neighbors = []
@@ -552,9 +683,9 @@ def _compute_neighbors_of_neighbors_along_direction(
         neigh_principal_pts = principal_axis_pts[neighbor]
         neigh_principal_vector = principal_axes[neighbor]
         # get intersection between grid of main cell and points of neighbor principal axis
-        neigh_center = find_closest(grid_coords, neigh_principal_pts, 20)
+        neigh_center = find_closest(grid_coords, neigh_principal_pts)
         # place grid and sample slice for neighbor
-        neigh_rot = _get_rotation(neigh_principal_vector)
+        neigh_rot = get_rotation(neigh_principal_vector)
         neigh_placed_grid = place_sampling_grids(grid_to_place, neigh_center, neigh_rot)
         neigh_sampled_slice = sample_volume_at_coordinates(
             labeled_img,
@@ -588,6 +719,55 @@ def compute_2D_statistics_along_axes(
            Dict[int, List[float]], 
            Dict[int, Dict[int, List[int]]], 
            Dict[int, Tuple[List[List[float]], List[float]]]]:
+    """
+    Compute cell statistics (area, neighbors and neighbors of neighbors) along slices obtained 
+    on the cells' principal axes directions.
+
+    Parameters:
+    -----------
+        labeled_img: (np.ndarray[int])
+            The 3D labeled image representing the segmented cell tissue.
+
+        cell_mesh_dict: (Dict[int, tm.base.Trimesh])
+            A dictionary that associated to cell ids (keys), a trimesh cell mesh (values).
+
+        exclude_labels: (Iterable[int])
+            A list of cell labels to exclude from the computation.
+            
+        voxel_size: (Iterable[float])
+            The size of voxels in the labeled image.
+
+        number_slices: (int = 10)
+            The number of slices to take along the apical-basal axis for each cell in the image.
+
+        slice_size: (int = 200)
+            The number of points considered for each side of the grid used for sampling slices along
+            the apical-basal axis.
+
+        remove_empty: (Optional[bool] = True)
+            If `True`, emppty values are removed from the results, in order to reduce the size of the 
+            returned data structure.
+
+    Returns:
+    --------
+        neighbors_dict: (Dict[int, List[List[int]]])
+            A dictionary in which each key is a cell id and the correspondent value is a list of
+            list of neighboring cell ids. Specifically each sublist of neighbor ids is associated 
+            to a 2D slice.
+
+        areas_dict: (Dict[int, List[float]])
+            A dictionary in which each key is a cell id and the correspondent value is a list of
+            the cell area values for each one of the 2D slices.
+         
+        neighbors_of_neighbors_dict: (Dict[int, Dict[int, List[int]]]) 
+            A dictionary in which each key is a cell id and the correspondent value is another
+            dictionary. The latter's keys are the numbers of neighbors found for the previously
+            mentioned cell id, while its values are lists of number of neighbors of neighbors. 
+
+        slices_dict: (Dict[int, Tuple[List[List[float]], List[float]]]])
+            A dictionary containing data to reconstruct the 2D sampling grids for each cell id
+            (mainly useful for debugging).
+    """
     
     if np.any(slice_size > np.asarray(labeled_img.shape)):
         slice_size = np.min(labeled_img.shape)
@@ -606,16 +786,17 @@ def compute_2D_statistics_along_axes(
             cell_centroids[label_id] = None
             cell_lengths[label_id] = None
         else:
-            # Compute principal axis, axis length and centroid coordinates 
+            # Compute principal axis, axis length, centroid coordinates, and sequence of points
+            # along the principal axis direction 
             cell_mesh = cell_mesh_dict[label_id]
-            principal_axis = _get_principal_axis(
+            principal_axis = get_principal_axis(
                 mesh=cell_mesh,
                 scale=voxel_size
             )
             cell_principal_axes[label_id] = principal_axis
 
             binary_img = (labeled_img == label_id).astype(np.uint8)
-            cell_centroid, cell_length = _get_centroid_and_length(binary_img)
+            cell_centroid, cell_length = get_centroid_and_length(binary_img)
             cell_length = int(cell_length // 2)
             cell_centroids[label_id] = cell_centroid
             cell_lengths[label_id] = cell_length
@@ -640,13 +821,14 @@ def compute_2D_statistics_along_axes(
             slices_dict[label_id] = ()
         else:
             # Get slices along principal axis direction
-            labeled_slices, grid_coords, slices_specs = _get_slices_along_direction(
+            labeled_slices, grid_coords, new_voxel_size, slices_specs = get_slices_along_direction(
                 labeled_img=labeled_img,
                 slicing_dir=cell_principal_axes[label_id],
                 centroid=cell_centroids[label_id],
                 height=cell_lengths[label_id],
                 grid_to_place=grid,
-                num_slices=number_slices
+                num_slices=number_slices,
+                original_voxel_size=voxel_size
             )
 
             # Iterate across slices to compute the statistics
@@ -657,7 +839,7 @@ def compute_2D_statistics_along_axes(
                 area_in_slice = _compute_2D_area_along_direction(
                     labeled_slice=labeled_slice,
                     cell_label=label_id,
-                    pixel_size=voxel_size[:2]
+                    pixel_size=new_voxel_size[:2]
                 )
                 cell_areas.append(area_in_slice)
 

@@ -3,6 +3,11 @@ import numpy as np
 import trimesh
 from typing import List
 
+"""
+An extended version of the trimesh.Trimesh class that uses KDtrees to efficiently compute 
+contacts between mesh faces.
+"""
+
 class ExtendedTrimesh(trimesh.Trimesh):
     def __init__(self, *args, **kwargs):
         """

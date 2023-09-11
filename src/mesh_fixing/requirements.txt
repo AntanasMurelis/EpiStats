@@ -1,9 +1,0 @@
-scikit-image
-trimesh
-tqdm
-scikit-learn
-notebook
-pymeshlab
-pymeshfix
-napari_process_points_and_surfaces 
-pyqt5-tools

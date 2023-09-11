@@ -45,3 +45,6 @@ venv/
 # Hydra outputs:
 
 outputs
+
+# Ignore all __pycache__ folders
+**/__pycache__

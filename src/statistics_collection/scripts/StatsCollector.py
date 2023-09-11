@@ -1,11 +1,14 @@
+import os
+import sys
 import numpy as np
 import pandas as pd
 import trimesh as tm
-import os
 import pickle
-from typing import Optional, List, Tuple, Iterable, Dict, Union, Callable
+from typing import Optional, List, Tuple, Iterable, Dict, Union
+
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 from LabelPreprocessing import get_labels_touching_edges, get_labels_touching_background
-from StatsUtils import *
+from StatsCompute import *
 
 #--------------------------------------------------------------------------------------------------
 class StatsCollector:
@@ -348,10 +351,23 @@ class StatsCollector:
         #compute number of neighbors in 2D slices
         if '2D_statistics' in self.features:
             self.df["num_neighbors_2D"] = self.df['neighbors_2D'].apply(lambda x: [len(l) for l in x])
+            neighbors_changes = []
+            for num_neighbors_lst in self.df["num_neighbors_2D"]:
+                neighbors_changes.append(
+                    np.sum(
+                        (num_neighbors_lst.values[1:] - num_neighbors_lst.values[:-1]).astype(bool) 
+                ))
+            self.df["num_neighbors_changes_2D"] = neighbors_changes
 
         if '2D_statistics_apical_basal' in self.features:
             self.df["num_neighbors_2D_principal"] = self.df['neighbors_2D_principal'].apply(lambda x: [len(l) for l in x])
-
+            neighbors_changes = []
+            for num_neighbors_lst in self.df["num_neighbors_2D_principal"]:
+                neighbors_changes.append(
+                    np.sum(
+                        (num_neighbors_lst.values[1:] - num_neighbors_lst.values[:-1]).astype(bool) 
+                ))
+            self.df["num_neighbors_changes_2D_principal"] = neighbors_changes
 
     def collect_statistics(
             self,

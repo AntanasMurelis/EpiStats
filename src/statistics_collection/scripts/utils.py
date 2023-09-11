@@ -1,7 +1,8 @@
-import numpy as np
-from skimage import io
 import os
 import json
+import numpy as np
+from skimage import io
+from scipy.spatial import kdtree
 from scipy.spatial.distance import euclidean
 from scipy.spatial.transform import Rotation
 from skimage.measure import regionprops
@@ -109,41 +110,46 @@ def read_config(path):
 
 
 #------------------------------------------------------------------------------------------------------------
-def find_closest(points_cloud1, points_cloud2, lower_threshold):
-    # Iterate through all combinations of points
-    min_dist = float("inf")
-    closest_points = None, None
-    found = False
-    midpoint = points_cloud1.shape[0]//2
-    for i in range(midpoint):
-        for j in range(points_cloud2.shape[0]):
-            point1, point2 = points_cloud1[midpoint+i, :], points_cloud2[j, :]
-            distance = euclidean(point1, point2)
-            if distance < lower_threshold:
-                closest_points = point1, point2
-                found = True
-                break
-            if distance < min_dist:
-                closest_points = point1, point2
-                min_dist = distance
-            point1 = points_cloud1[midpoint-i, :]
-            distance = euclidean(point1, point2)
-            if distance < lower_threshold:
-                closest_points = point1, point2
-                found = True
-                break
-            if distance < min_dist:
-                closest_points = point1, point2
-                min_dist = distance
-        if found: break
+def find_closest(
+        point_cloud1: np.ndarray,
+        point_cloud2: np.ndarray,
+) -> np.ndarray:
+    """
+    Given two 3D pointclouds, find the closest pair of points, each one belonging to one 
+    of the two point clouds. Then, return the midpoint among the pair.
     
-    return sum(closest_points) / 2
+    Parameters:
+    -----------
+        points_cloud1: (np.ndarray)
+            A (M, 3) array, whose rows are the coordinates of the M points in the point cloud.
+
+        points_cloud2: (np.ndarray)
+            A (N, 3) array, whose rows are the coordinates of the N points in the point cloud.
+
+    Returns:
+    --------
+        (np.ndarray):
+            The midpoint among the pair of closest points, each one belonging to one 
+            of the two point clouds.
+    """
+    
+    # Calculate the pairwise Euclidean distances between all points in the two clouds
+    distances = np.sqrt(((point_cloud1[:, np.newaxis] - point_cloud2) ** 2).sum(axis=-1))
+
+    # Find the minimum distance and the indices of the closest pair of points
+    min_indices = np.unravel_index(np.argmin(distances), distances.shape)
+
+    # Get the closest pair of points
+    closest_point1 = point_cloud1[min_indices[0]]
+    closest_point2 = point_cloud2[min_indices[1]]
+    
+    return (closest_point1 + closest_point2) / 2
 #------------------------------------------------------------------------------------------------------------
 
 
 
 #------------------------------------------------------------------------------------------------------------
-def _get_centroid_and_length(
+def get_centroid_and_length(
         binary_img: np.ndarray[int]
 ) -> Tuple[np.ndarray[float], float]:
     """
@@ -162,6 +168,7 @@ def _get_centroid_and_length(
         length: (float)
             The length of the major axis of the object in the binary image.
     """ 
+
     props = regionprops(binary_img)[0]
     centroid = props.centroid
     _, _, min_z, _, _, max_z = props.bbox
@@ -173,48 +180,62 @@ def _get_centroid_and_length(
 
 
 #------------------------------------------------------------------------------------------------------------
-def _get_slices_along_direction(
+def get_slices_along_direction(
     labeled_img: np.ndarray[int],
     slicing_dir: Iterable[float],
     centroid: Iterable[float],
     height: int,    
     grid_to_place: np.ndarray[int],
+    original_voxel_size: Optional[float],
     num_slices: Optional[int] = 10,
-) -> Tuple[List[np.ndarray[int]], Tuple[List[List[float]], List[float]]]:
+) -> Tuple[List[np.ndarray[int]], Tuple[List[List[float]], np.ndarray[float], List[float]]]:
     """
     Extract 2D slice along a given direction from a 3D labeled image.
 
     Parameters:
     -----------
-        labeled_img: (np.ndarray[int])
-            A 3D labeled image where the background has a label of 0 and cells are labeled with 
-            consecutive integers starting from 1.
-        
-        slicing_dir: (Iterable[float])
-            A triplet describing a unit vector in the labeled_img 3D coordinate system.
 
-        centroid: (Iterable[float])
-            A triplet associated to the coordinates of the centroid of the object at the center
-            of the slices.
-        
-        height: (int)
-            The height of the sliced volume above and below the centroid (i.e. total volum is 2*height).
-        
-        slice_size: (Optional[int], default=200)
-            The size of the each side (orthogonal to slicing_dir) of the grid used to extract slices.
-        
-        num_slices: (Optional[int], default=10)
-            The number of slices to extract from the labeled image.
+    labeled_img: (np.ndarray[int])
+        A 3D labeled image where the background has a label of 0 and cells are labeled with 
+        consecutive integers starting from 1.
+    
+    slicing_dir: (Iterable[float])
+        A triplet describing a unit vector in the labeled_img 3D coordinate system.
+
+    centroid: (Iterable[float])
+        A triplet associated to the coordinates of the centroid of the object at the center
+        of the slices.
+    
+    height: (int)
+        The height of the sliced volume above and below the centroid (i.e. total volum is 2*height).
+    
+    slice_size: (Optional[int], default=200)
+        The size of the each side (orthogonal to slicing_dir) of the grid used to extract slices.
+    
+    num_slices: (Optional[int], default=10)
+        The number of slices to extract from the labeled image.
+    
+    original_voxel_size: (np.ndarray[float])
+        The voxel size in the original coordinate system.
 
     Returns:
     --------
-        labeled_slices: (List[np.ndarray[int]])
-            A list of slices obtained along slicing_dir direction.
-        
-        grid_specs: (Tuple[List[List[float]], List[float]]])
-            A tuple consisting of lists of coordinates of grid centers and slicing directions (which
-            is always the same). These values are used to identify the grids that have been used
-            to sample labeled_slices from labeled_img.
+
+    labeled_slices: (List[np.ndarray[int]])
+        A list of slices obtained along slicing_dir direction.
+
+    grid_coords: (List[np.ndarray[float]])
+        A list of grid coordinates used to sample slices for the original volume.
+    
+    new_voxel_size: (np.ndarray[float])
+        The voxel size seen in the coordinate system defined by the new slicing direction.
+        Note that if the voxels in the original volume are isotropic, the new voxel size is 
+        the same as the original one. 
+    
+    grid_specs: (Tuple[List[List[float]], List[float]]])
+        A tuple consisting of lists of coordinates of grid centers and slicing directions (which
+        is always the same). These values are used to identify the grids that have been used
+        to sample labeled_slices from labeled_img.
     """
     
     # Define the centers of the sampling grids
@@ -225,7 +246,11 @@ def _get_slices_along_direction(
     ]
 
     # Compute the rotation matrix
-    rot = _get_rotation(slicing_dir)
+    rot = get_rotation(slicing_dir)
+    
+    # Compute the voxel sizes in the new coordinate system
+    new_axes_directions = rot[0].as_matrix() # (X, Y, Z as column vectors, Z is the principal axis)
+    new_voxel_size = abs(np.dot(new_axes_directions, original_voxel_size))
 
     # Store identifiers of the different grids (centers and direction)
     grid_specs = (
@@ -252,13 +277,13 @@ def _get_slices_along_direction(
 
         labeled_slices.append(sampled_slice)
 
-    return labeled_slices, grid_coords, grid_specs
+    return labeled_slices, grid_coords, new_voxel_size, grid_specs
 #------------------------------------------------------------------------------------------------------------
 
 
 
 #------------------------------------------------------------------------------------------------------------
-def _get_principal_axis(
+def get_principal_axis(
         mesh: tm.base.Trimesh,
 		scale: Iterable[float],
 ) -> np.ndarray[float]:
@@ -267,22 +292,24 @@ def _get_principal_axis(
 
 	Parameters:
 	-----------
-		mesh: (tm.base.Trimesh)
-			A Trimesh object in a N-dimensional space (N=2,3). 
 
-		scale: (np.ndarray[float])
-			An array of shape (N,) containing scale of mesh coordinate system in microns.
-			NOTE: in the statistics collection pipeline the labeled image is to be 
-			considered in a coordinate system of scale (1, 1, 1), whereas meshes are 
-			generated in a different system with scale (voxel_size). 
-			Therefore for this task we need to move the principal axis computed on the mesh
-			into the labeled image coordinate system. 
+    mesh: (tm.base.Trimesh)
+        A Trimesh object in a N-dimensional space (N=2,3). 
+
+    scale: (np.ndarray[float])
+        An array of shape (N,) containing scale of mesh coordinate system in microns.
+        NOTE: in the statistics collection pipeline the labeled image is to be 
+        considered in a coordinate system of scale (1, 1, 1), whereas meshes are 
+        generated in a different system with scale (voxel_size). 
+        Therefore for this task we need to move the principal axis computed on the mesh
+        into the labeled image coordinate system. 
 
 	Returns:
 	--------
-		normalized_principal_axis: (np.ndarray[float])
-			An array of shape (N,) representing the components of the rescaled and normalized 
-			principal axis.
+
+    normalized_principal_axis: (np.ndarray[float])
+        An array of shape (N,) representing the components of the rescaled and normalized 
+        principal axis.
 	"""
 	eigen_values, eigen_vectors = tm.inertia.principal_axis(mesh.moment_inertia)
 	smallest_eigen_value_idx = np.argmin(np.abs(eigen_values))
@@ -297,7 +324,21 @@ def _get_principal_axis(
 
 
 #------------------------------------------------------------------------------------------------------------
-def _get_rotation(principal_vector):
+def get_rotation(
+        principal_vector: np.ndarray
+    ) -> Rotation:
+    """
+    Given the direction of the principal vector, compute the rotation matrix 
+    finding the pair of orthogonal unit vectors that form the new coordinate 
+    system.
+
+    Parameters:
+    -----------
+
+    principal_vector: np.ndarray
+        The principal vector that determines the rotation.
+
+    """
     random_vector = np.random.rand(3)
     normal_vector = random_vector - np.dot(random_vector, principal_vector) * principal_vector
     normal_unit_vector = normal_vector / np.linalg.norm(normal_vector)
