@@ -36,8 +36,8 @@ pip3 install -r requirements.txt
   ```
   src/statistics_collection/
   ```
-- Scripts for mesh refinement is in
+- Scripts for mesh refinement and preparation is in
   ```
-  src/mesh_fixing
+  src/mesh_fixing/
   ```
  
