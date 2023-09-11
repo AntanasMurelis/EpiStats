@@ -22,7 +22,7 @@ python path/to/run_collection.py --config path/to/config/file
 - In `config.json` you don't need to specify `input_path`, `tissue`, `tissue_type`, `filtering`, `slicing_dim` and `voxel_size`, since they depend on the specific sample. Instead, you have to insert them in `submit_jobs.py` script as follows:
   <br>
   
-  ![set_user_inputs](images/submit_jobs_user_inputs.png)
+  ![set_user_inputs](https://github.com/AntanasMurelis/EpiStats/blob/main/images/submit_jobs_user_inputs.png)
 
 - Check that the paths files/scripts in `submit_jobs.py` are consistent:
   <br>
