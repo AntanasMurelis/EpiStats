@@ -155,15 +155,13 @@ def main(
 
 if __name__ =="__main__":
 
-    out_root_path = '/nas/groups/iber/Users/Federico_Carrara/Statistics_Collection/outputs/outputs_v3'
+    out_root_path = '/path/to/stats/collection/outputs'
 
     ### SPECIFY PATHS TO INPUT CSV TISSUE DATASETS ###
     df_files = [
-        'output_bladder_control_curated_segmentation_s_10_e_6_d_8/cell_stats/stats_dataset_bladder.csv',
-        'output_esophagus_Z2_curated_crop_s_10_e_6_d_8/cell_stats/stats_dataset_esophagus.csv',
-        'output_intestine_sample2_b_curated_segmentation_relabel_seq_s_10_e_6_d_8/cell_stats/stats_dataset_intestine_villus.csv',
-        'output_lung_new_sample_b_curated_segmentation_central_crop_relabel_seq_s_10_e_6_d_8/cell_stats/stats_dataset_lung_bronchiole.csv',
-        'output_lung_pseudostratified_from_harold_s_10_e_6_d_8/cell_stats/stats_dataset_lung.csv'
+        'output_tissue_1/cell_stats/stats_tissue_1.csv',
+        'output_tissue_1/cell_stats/stats_tissue_2.csv',
+        'output_tissue_1/cell_stats/stats_tissue_3.csv'
     ]
     df_paths = [os.path.join(out_root_path, df_file) for df_file in df_files]
     ###################################################
