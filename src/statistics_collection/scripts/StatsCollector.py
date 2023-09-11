@@ -158,7 +158,7 @@ class StatsCollector:
     def filter_cells(self) -> List[int]:
         
         idxs_to_filter = set()
-        if ["touching_bg"] in self.filtering:
+        if "touching_bg" in self.filtering:
             crop_lims = [150, 360] if self.tissue == "lung" else None
             new_idxs_to_filter, _ = get_labels_touching_background(
                 labeled_img=self.labels, 
@@ -168,7 +168,7 @@ class StatsCollector:
                 output_directory=self.output_dir,
             )
             idxs_to_filter.update(new_idxs_to_filter)
-        elif ["cut_cells"] in self.filtering:
+        elif "cut_cells" in self.filtering:
             new_idxs_to_filter = get_labels_touching_edges(
                 labeled_img=self.labels, 
                 output_directory=self.output_dir
