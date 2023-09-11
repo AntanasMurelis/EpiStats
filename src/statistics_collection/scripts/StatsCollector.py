@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import trimesh as tm
 import pickle
-from typing import Optional, List, Tuple, Iterable, Dict, Union
+from typing import Optional, List, Tuple, Iterable, Dict, Union, Literal
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 from LabelPreprocessing import get_labels_touching_edges, get_labels_touching_background
@@ -75,18 +75,21 @@ class StatsCollector:
             output_directory: str,
             path_to_img: str,
             tissue: str,
+            tissue_type: str,
+            filtering: List[Literal["cut_cells", "no_filtering", "touching_bg"]],
             voxel_size: Iterable[float],
             num_2D_slices: int,
             size_2D_slices: int,
             num_workers: int
         ) -> None:
 
-        self._avail_features = [
+        # Utility attributes
+        _avail_features = [
             "area", "volume", "principal_axis_and_elongation", 
             "neighbors", "contact_area", "2D_statistics", 
             "2D_statistics_apical_basal"
         ]
-        self._avail_functions = [
+        _avail_functions = [
             compute_cell_surface_areas,
             compute_cell_volumes,
             compute_cell_principal_axis_and_elongation,
@@ -95,28 +98,43 @@ class StatsCollector:
             compute_2D_statistics,
             compute_2D_statistics_along_axes
         ]
-        self._features_to_functions = dict(zip(self._avail_features, self._avail_functions))
-        self._avail_tissues = [
+        _features_to_functions = dict(zip(_avail_features, _avail_functions))
+        _avail_tissues = [
             'bladder', 'intestine_villus', 'lung_bronchiole', 'esophagus', 'embryo', 'lung'
         ]
-        self._avail_tissue_types = [
+        _avail_tissue_types = [
             'stratified_transitional', 'simple_columnar', 'simple_cuboidal', 
             'stratified_squamous', 'Undefined', 'pseudostratified'
         ]
-        self._tissues_to_types = dict(zip(self._avail_tissues, self._avail_tissue_types))
-        self._avail_slicing_dims = [0, 2, 1, 0, 2, 1]
-        self._tissues_to_slicing_dims = dict(zip(self._avail_tissues, self._avail_slicing_dims))
+        _tissues_to_types = dict(zip(_avail_tissues, _avail_tissue_types))
+        _avail_slicing_dims = [0, 2, 1, 0, 2, 1]
+        _tissues_to_slicing_dims = dict(zip(_avail_tissues, _avail_slicing_dims))
+        _tissues_to_filtering = dict(zip(
+            _avail_tissues, 
+            [["cut_cells"], ["cut_cells"], ["cut_cells"], ["cut_cells"], ["cut_cells"], ["no_filtering"], ["touching_bg"]]
+        ))
+        
+        # Attributes related to input samples
         self.features = features
-        self.functions = [self._features_to_functions[feat] for feat in features]
+        self.functions = [_features_to_functions[feat] for feat in features]
         self.tissue = tissue
-        self.tissue_type = self._tissues_to_types[tissue]
+        if tissue_type:
+            self.tissue_type = tissue_type
+        else:
+            self.tissue_type = _tissues_to_types[tissue]
         self.meshes = meshes
         self.labels = labels
         self.ids = list(self.meshes.keys())
         self.voxel_size = voxel_size
         self.num_2D_slices = num_2D_slices
         self.size_2D_slices = size_2D_slices
-        self.slicing_dim = self._tissues_to_slicing_dims[tissue]
+        self.slicing_dim = _tissues_to_slicing_dims[tissue]
+        if filtering:
+            self.filtering = filtering
+        else:
+            self.filtering = _tissues_to_filtering[self.tissue]
+        
+        # Attributes related to file paths and saving directories
         self.output_dir = output_directory
         self.df_output_dir = os.path.join(self.output_dir, 'cell_stats')
         self.path_to_img = path_to_img
@@ -136,23 +154,28 @@ class StatsCollector:
         #save the newly created data structure
         self._save_dataframe()    
     
+
     def filter_cells(self) -> List[int]:
-        if self.tissue == 'embryo':
-            idxs_to_filter = []
-        elif self.tissue == 'lung':
-            idxs_to_filter, _ = get_labels_touching_background(
-                self.labels, 
-                self.slicing_dim,
-                [150, 360],
-                0.1,
-                self.output_dir,
-            )
-        else:
-            idxs_to_filter = get_labels_touching_edges(
-                self.labels, self.output_dir
-            )
         
-        return idxs_to_filter
+        idxs_to_filter = set()
+        if ["touching_bg"] in self.filtering:
+            crop_lims = [150, 360] if self.tissue == "lung" else None
+            new_idxs_to_filter, _ = get_labels_touching_background(
+                labeled_img=self.labels, 
+                slicing_dim=self.slicing_dim,
+                crop_limits=crop_lims,
+                threshold=0.1,
+                output_directory=self.output_dir,
+            )
+            idxs_to_filter.update(new_idxs_to_filter)
+        elif ["cut_cells"] in self.filtering:
+            new_idxs_to_filter = get_labels_touching_edges(
+                labeled_img=self.labels, 
+                output_directory=self.output_dir
+            )
+            idxs_to_filter.update(new_idxs_to_filter)
+        
+        return list(idxs_to_filter)
         
 
     def _save_dataframe(
