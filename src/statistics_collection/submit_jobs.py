@@ -70,6 +70,9 @@ tissues = [
     'esophagus', 
     'lung'
 ]
+tissue_types = [None, None, None]
+filtering_methods = [None, None, None]
+slicing_dims = [None, None, None]
 voxel_sizes = [
     [0.325, 0.325, 0.25],
     [0.1625, 0.1625, 0.25],
@@ -89,6 +92,15 @@ input_paths = [os.path.join(COMMON_ROOT, input_file) for input_file in input_fil
 """
 
 tissues = ["tissue_name_1", "tissue_name_2", "tissue_name_3"]
+tissue_types = ["tissue_type_1", "tissue_type_2", "tissue_type_3"] 
+# or also tissue_types = [None, None, None] if `tissues` are among the predefined ones
+filtering_methods = [
+    ["choose among 'cut_cells' and/or 'touching_bg', or empty list []"],
+    ["choose among 'cut_cells' and/or 'touching_bg', or empty list []"],
+    ["choose among 'cut_cells' and/or 'touching_bg', or empty list []"]]
+# or also filtering_methods = [None, None, None] if `tissues` are among the predefined ones
+slicing_dims = [0, 0, 0] # int among [0, 1, 2] -> cartesian axes [x, y, z]
+# or also slicing_dims = [None, None, None] if `tissues` are among the predefined ones
 voxel_sizes = [[1, 1, 1], [1, 1, 1], [1, 1, 1]]
 input_paths = [
     "path/to/segmented/image/tissue_1.tif",
@@ -97,23 +109,26 @@ input_paths = [
 ]
 
 #For each tissue create a new config file and a new job submit script
-for tissue, voxel_size, input_path in zip(tissues, voxel_sizes ,input_paths):
+for i in range(len(tissues)):
     #update config file
-    curr_config["tissue"] = tissue
-    curr_config["voxel_size"] = voxel_size
-    curr_config["input_path"] = input_path
+    curr_config["tissue"] = tissues[i]
+    curr_config["tissue_type"] = tissue_types[i]
+    curr_config["filtering"] = filtering_methods[i]
+    curr_config["slicing_dim"] = slicing_dims[i]
+    curr_config["voxel_size"] = voxel_sizes[i]
+    curr_config["input_path"] = input_paths[i]
     
     #save the new config dictionary
     save_config_dir = './run_euler/configs'
     if not os.path.exists(save_config_dir):
         os.makedirs(save_config_dir)
-    with open(os.path.join(save_config_dir, f"config_{tissue}.json"), "w") as f_out:
+    with open(os.path.join(save_config_dir, f"config_{tissues[i]}.json"), "w") as f_out:
         json.dump(curr_config, f_out)
     
     #call a function to create a slurm script 
     path_to_job_script = create_slurm(
-        config_file=os.path.join(save_config_dir, f"config_{tissue}.json"), 
-        name=tissue,
+        config_file=os.path.join(save_config_dir, f"config_{tissues[i]}.json"), 
+        name=tissues[i],
         max_workers=curr_config["max_workers"],
         jobs_dir='./run_euler/jobs'
     )
