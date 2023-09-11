@@ -127,7 +127,7 @@ def get_labels_touching_background(
     background_touch_counts = {} 
 
     for i, labeled_slice in tqdm(enumerate(reordered_labeled_img), 
-                                 desc='Cheking cells touching background',
+                                 desc='Finding cells touching background',
                                  total=reordered_labeled_img.shape[0]):
         if (i < crop_limits[0]) or (i > crop_limits[1]):
             continue

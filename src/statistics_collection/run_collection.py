@@ -54,6 +54,9 @@ def main(config_path):
         output_directory=output_dir,
         path_to_img=os.path.join(output_dir, 'processed_labels.tif'),
         tissue=args.tissue,
+        tissue_type=args.tissue_type,
+        filtering=args.filtering,
+        slicing_dim=args.slicing_dim,
         voxel_size=args.voxel_size,
         num_2D_slices=args.num_2D_slices,
         size_2D_slices=args.size_2D_slices,
@@ -62,7 +65,7 @@ def main(config_path):
 
     stats_collector.collect_statistics(load_from_cache=args.load_from_cache)
 
-
+    
 if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description='Read JSON configuration file')

@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import trimesh as tm
 import pickle
-from typing import Optional, List, Tuple, Iterable, Dict, Union
+from typing import Optional, List, Tuple, Iterable, Dict, Union, Literal
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 from LabelPreprocessing import get_labels_touching_edges, get_labels_touching_background
@@ -17,32 +17,58 @@ class StatsCollector:
 
     Parameters:
     -----------
-        meshes: (Dict[int, tm.base.Trimesh])
-            The triangular meshes of the cell in the standard trimesh format
-            associated to the corresponding cell label.
+    meshes: (Dict[int, tm.base.Trimesh])
+        The triangular meshes of the cell in the standard trimesh format
+        associated to the corresponding cell label.
 
-        labels: (np.ndarray[int], 3D)
-            A 3D labeled image where the background has a label of 0 and cells are labeled with 
-            consecutive integers starting from 1.
-        
-        features: (List[str])
-            A list of features to compute. Can be chosen among:
-            ['area', 'volume', 'principal_axis_and_elongation', 'neighbors', 'contact_area'].
-        
-        output_directory: (str)
-            Path to the directory in which statistics will be saved.
-            In particular, the dataframe is saved in the subdir `cell_stats`,
-            while cached values of the statistics are saved in `cell_stats/cached_stats`.
-        
-        path_to_img: (str)
-            Path to the file containing the preprocessed image.
-        
-        tissue: (str)
-            Name of the tissue under analysis. Can be chosen among:
-            ['bladder', 'intestine_villus', 'lung_bronchiole', 'esophagus']
-        
-        num_workers: (int)
-            Number of workers used for computation of conatct area between cells.
+    labels: (np.ndarray[int], 3D)
+        A 3D labeled image where the background has a label of 0 and cells are labeled with 
+        consecutive integers starting from 1.
+    
+    features: (List[str])
+        A list of features to compute. Can be chosen among:
+        ['area', 'volume', 'principal_axis_and_elongation', 'neighbors', 'contact_area'].
+    
+    output_directory: (str)
+        Path to the directory in which statistics will be saved.
+        In particular, the dataframe is saved in the subdir `cell_stats`,
+        while cached values of the statistics are saved in `cell_stats/cached_stats`.
+    
+    path_to_img: (str)
+        Path to the file containing the preprocessed image.
+    
+    tissue: (str)
+        Name of the tissue under analysis. Available predefined tissues are:
+        ['bladder', 'intestine_villus', 'lung_bronchiole', 'esophagus', 'embryo', 'lung']
+
+    tissue_type: (str)
+        The type of the tissue under analysis. In case `tissue` is not among the predefined
+        ones, `tissue_type` must be specified by the user. Otherwise, the tissue types associated 
+        to available tissues are:
+        ['stratified_transitional', 'simple_columnar', 'simple_cuboidal', 'stratified_squamous', 
+        'Undefined', 'pseudostratified']
+
+    filtering: (List[Literal["cut_cells", "touching_bg"]])
+        A list of metods to filter out cells which are not wanted for statistics collection.
+        In particular, the options "cut_cells" and "touching_bg" are respectively associated
+        to the functions `get_labels_touching_edges` and `get_labels_touching_background` from
+        `LabelPreprocessing.py`.
+
+    voxel_size: (Iterable[float])
+        The voxel size of the input labeled image.
+
+    slicing_dim: (Literal[0, 1, 2])
+        The axis along which 2D slices are taken in the case of 2D statistics collection from 
+        canonical axes.
+
+    num_2D_slices: (int)
+        The number of 2D slices to extract statistics from.
+    
+    size_2D_slices: (int)
+        The number of pixels of the 2D slices used to extract statistics
+    
+    num_workers: (int)
+        Number of workers used for computation of conatct area between cells.
 
 
     Example:
@@ -75,18 +101,22 @@ class StatsCollector:
             output_directory: str,
             path_to_img: str,
             tissue: str,
+            tissue_type: str,
+            filtering: List[Literal["cut_cells", "no_filtering", "touching_bg"]],
             voxel_size: Iterable[float],
+            slicing_dim: Literal[0, 1, 2],
             num_2D_slices: int,
             size_2D_slices: int,
             num_workers: int
         ) -> None:
 
-        self._avail_features = [
+        # Utility attributes
+        _avail_features = [
             "area", "volume", "principal_axis_and_elongation", 
             "neighbors", "contact_area", "2D_statistics", 
             "2D_statistics_apical_basal"
         ]
-        self._avail_functions = [
+        _avail_functions = [
             compute_cell_surface_areas,
             compute_cell_volumes,
             compute_cell_principal_axis_and_elongation,
@@ -95,28 +125,46 @@ class StatsCollector:
             compute_2D_statistics,
             compute_2D_statistics_along_axes
         ]
-        self._features_to_functions = dict(zip(self._avail_features, self._avail_functions))
-        self._avail_tissues = [
+        _features_to_functions = dict(zip(_avail_features, _avail_functions))
+        _avail_tissues = [
             'bladder', 'intestine_villus', 'lung_bronchiole', 'esophagus', 'embryo', 'lung'
         ]
-        self._avail_tissue_types = [
+        _avail_tissue_types = [
             'stratified_transitional', 'simple_columnar', 'simple_cuboidal', 
             'stratified_squamous', 'Undefined', 'pseudostratified'
         ]
-        self._tissues_to_types = dict(zip(self._avail_tissues, self._avail_tissue_types))
-        self._avail_slicing_dims = [0, 2, 1, 0, 2, 1]
-        self._tissues_to_slicing_dims = dict(zip(self._avail_tissues, self._avail_slicing_dims))
+        _tissues_to_types = dict(zip(_avail_tissues, _avail_tissue_types))
+        _avail_slicing_dims = [0, 2, 1, 0, 2, 1]
+        _tissues_to_slicing_dims = dict(zip(_avail_tissues, _avail_slicing_dims))
+        _tissues_to_filtering = dict(zip(
+            _avail_tissues, 
+            [["cut_cells"], ["cut_cells"], ["cut_cells"], ["cut_cells"], ["cut_cells"], ["no_filtering"], ["touching_bg"]]
+        ))
+        
+        # Attributes related to input samples
         self.features = features
-        self.functions = [self._features_to_functions[feat] for feat in features]
+        self.functions = [_features_to_functions[feat] for feat in features]
         self.tissue = tissue
-        self.tissue_type = self._tissues_to_types[tissue]
+        if tissue_type:
+            self.tissue_type = tissue_type
+        else:
+            self.tissue_type = _tissues_to_types[tissue]
         self.meshes = meshes
         self.labels = labels
         self.ids = list(self.meshes.keys())
         self.voxel_size = voxel_size
         self.num_2D_slices = num_2D_slices
         self.size_2D_slices = size_2D_slices
-        self.slicing_dim = self._tissues_to_slicing_dims[tissue]
+        if isinstance(slicing_dim, int):
+            self.slicing_dim = slicing_dim
+        else:
+            self.slicing_dim = _tissues_to_slicing_dims[tissue]
+        if filtering:
+            self.filtering = filtering
+        else:
+            self.filtering = _tissues_to_filtering[self.tissue]
+        
+        # Attributes related to file paths and saving directories
         self.output_dir = output_directory
         self.df_output_dir = os.path.join(self.output_dir, 'cell_stats')
         self.path_to_img = path_to_img
@@ -136,23 +184,28 @@ class StatsCollector:
         #save the newly created data structure
         self._save_dataframe()    
     
+
     def filter_cells(self) -> List[int]:
-        if self.tissue == 'embryo':
-            idxs_to_filter = []
-        elif self.tissue == 'lung':
-            idxs_to_filter, _ = get_labels_touching_background(
-                self.labels, 
-                self.slicing_dim,
-                [150, 360],
-                0.1,
-                self.output_dir,
-            )
-        else:
-            idxs_to_filter = get_labels_touching_edges(
-                self.labels, self.output_dir
-            )
         
-        return idxs_to_filter
+        idxs_to_filter = set()
+        if "touching_bg" in self.filtering:
+            crop_lims = [150, 360] if self.tissue == "lung" else None
+            new_idxs_to_filter, _ = get_labels_touching_background(
+                labeled_img=self.labels, 
+                slicing_dim=self.slicing_dim,
+                crop_limits=crop_lims,
+                threshold=0.1,
+                output_directory=self.output_dir,
+            )
+            idxs_to_filter.update(new_idxs_to_filter)
+        elif "cut_cells" in self.filtering:
+            new_idxs_to_filter = get_labels_touching_edges(
+                labeled_img=self.labels, 
+                output_directory=self.output_dir
+            )
+            idxs_to_filter.update(new_idxs_to_filter)
+        
+        return list(idxs_to_filter)
         
 
     def _save_dataframe(
@@ -353,9 +406,10 @@ class StatsCollector:
             self.df["num_neighbors_2D"] = self.df['neighbors_2D'].apply(lambda x: [len(l) for l in x])
             neighbors_changes = []
             for num_neighbors_lst in self.df["num_neighbors_2D"]:
+                num_neighbors_lst = np.asarray(num_neighbors_lst)
                 neighbors_changes.append(
                     np.sum(
-                        (num_neighbors_lst.values[1:] - num_neighbors_lst.values[:-1]).astype(bool) 
+                        (num_neighbors_lst[1:] - num_neighbors_lst[:-1]).astype(bool) 
                 ))
             self.df["num_neighbors_changes_2D"] = neighbors_changes
 
@@ -363,11 +417,13 @@ class StatsCollector:
             self.df["num_neighbors_2D_principal"] = self.df['neighbors_2D_principal'].apply(lambda x: [len(l) for l in x])
             neighbors_changes = []
             for num_neighbors_lst in self.df["num_neighbors_2D_principal"]:
+                num_neighbors_lst = np.asarray(num_neighbors_lst)
                 neighbors_changes.append(
                     np.sum(
-                        (num_neighbors_lst.values[1:] - num_neighbors_lst.values[:-1]).astype(bool) 
+                        (num_neighbors_lst[1:] - num_neighbors_lst[:-1]).astype(bool) 
                 ))
             self.df["num_neighbors_changes_2D_principal"] = neighbors_changes
+
 
     def collect_statistics(
             self,
