@@ -376,9 +376,10 @@ class StatsCollector:
             self.df["num_neighbors_2D"] = self.df['neighbors_2D'].apply(lambda x: [len(l) for l in x])
             neighbors_changes = []
             for num_neighbors_lst in self.df["num_neighbors_2D"]:
+                num_neighbors_lst = np.asarray(num_neighbors_lst)
                 neighbors_changes.append(
                     np.sum(
-                        (num_neighbors_lst.values[1:] - num_neighbors_lst.values[:-1]).astype(bool) 
+                        (num_neighbors_lst[1:] - num_neighbors_lst[:-1]).astype(bool) 
                 ))
             self.df["num_neighbors_changes_2D"] = neighbors_changes
 
@@ -386,11 +387,13 @@ class StatsCollector:
             self.df["num_neighbors_2D_principal"] = self.df['neighbors_2D_principal'].apply(lambda x: [len(l) for l in x])
             neighbors_changes = []
             for num_neighbors_lst in self.df["num_neighbors_2D_principal"]:
+                num_neighbors_lst = np.asarray(num_neighbors_lst)
                 neighbors_changes.append(
                     np.sum(
-                        (num_neighbors_lst.values[1:] - num_neighbors_lst.values[:-1]).astype(bool) 
+                        (num_neighbors_lst[1:] - num_neighbors_lst[:-1]).astype(bool) 
                 ))
             self.df["num_neighbors_changes_2D_principal"] = neighbors_changes
+
 
     def collect_statistics(
             self,
