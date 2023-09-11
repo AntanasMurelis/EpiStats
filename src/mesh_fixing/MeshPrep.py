@@ -16,8 +16,8 @@ from skimage import io
 from scipy.ndimage import binary_dilation, binary_closing
 from OuterShell import ExtendedTrimesh, OuterShell
 from misc import get_cell_neighbors
-"""Script for remeshing and preparing meshes for the SimuCell3D."""
 
+"""Script for mesh refinement and preparation for the SimuCell3D."""
 
 #---------------------------------------------------------------------------------------------------------------
 def get_edges_with_more_than_two_faces(mesh: trimesh.Trimesh):
