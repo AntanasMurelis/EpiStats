@@ -17,12 +17,24 @@ We list here the content of this directory, giving a brief explanation of each f
 python path/to/run_collection.py --config path/to/config/file
 ```
 
+NOTE: for the sake of convenience, the values of `tissue_type`, `filtering` and `slicing_dim` have been hardcoded for the following tissue names:
+  
+`intestine_villus`, `lung_bronchiole`, `bladder`, `esophagus`, `lung`, `embryo`
+  
+Therefore, for these tissues the user can set the values of `tissue_type`, `filtering` and `slicing_dim` to `None`.
+
 #### 2. Statistics collection for multiple samples in parallel (on cluster)
 - Set your parameters in the config file.
 - In `config.json` you don't need to specify `input_path`, `tissue`, `tissue_type`, `filtering`, `slicing_dim` and `voxel_size`, since they depend on the specific sample. Instead, you have to insert them in `submit_jobs.py` script as follows:
   <br>
   
   ![set_user_inputs](https://github.com/AntanasMurelis/EpiStats/blob/main/images/submit_jobs_user_inputs.png)
+
+  NOTE: for the sake of convenience, the values of `tissue_type`, `filtering` and `slicing_dim` have been hardcoded for the following tissue names:
+
+  `intestine_villus`, `lung_bronchiole`, `bladder`, `esophagus`, `lung`, `embryo`
+
+  Therefore, for these tissues the user can set the values of `tissue_type`, `filtering` and `slicing_dim` to `None`.
 
 - Check that the paths files/scripts in `submit_jobs.py` are consistent:
   <br>
