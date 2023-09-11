@@ -19,12 +19,10 @@ python path/to/run_collection.py --config path/to/config/file
 
 #### 2. Statistics collection for multiple samples in parallel (on cluster)
 - Set your parameters in the config file.
-- In `config.json` you don't need to specify `input_path`, `tissue`, and `voxel_size`, since they depend on the specific sample. Instead, you have to insert them in `submit_jobs.py` script as follows:
+- In `config.json` you don't need to specify `input_path`, `tissue`, `tissue_type`, `filtering`, `slicing_dim` and `voxel_size`, since they depend on the specific sample. Instead, you have to insert them in `submit_jobs.py` script as follows:
   <br>
   
-  ![set_tissues](https://github.com/AntanasMurelis/EpiStats/blob/main/images/info_run_collection_1.png)
-  ![set_voxel_sizes](https://github.com/AntanasMurelis/EpiStats/blob/main/images/info_run_collection_2.png)
-  ![set_paths](https://github.com/AntanasMurelis/EpiStats/blob/main/images/info_run_collection_3.png)
+  ![set_user_inputs](images/submit_jobs_user_inputs.png)
 
 - Check that the paths files/scripts in `submit_jobs.py` are consistent:
   <br>
