@@ -17,32 +17,58 @@ class StatsCollector:
 
     Parameters:
     -----------
-        meshes: (Dict[int, tm.base.Trimesh])
-            The triangular meshes of the cell in the standard trimesh format
-            associated to the corresponding cell label.
+    meshes: (Dict[int, tm.base.Trimesh])
+        The triangular meshes of the cell in the standard trimesh format
+        associated to the corresponding cell label.
 
-        labels: (np.ndarray[int], 3D)
-            A 3D labeled image where the background has a label of 0 and cells are labeled with 
-            consecutive integers starting from 1.
-        
-        features: (List[str])
-            A list of features to compute. Can be chosen among:
-            ['area', 'volume', 'principal_axis_and_elongation', 'neighbors', 'contact_area'].
-        
-        output_directory: (str)
-            Path to the directory in which statistics will be saved.
-            In particular, the dataframe is saved in the subdir `cell_stats`,
-            while cached values of the statistics are saved in `cell_stats/cached_stats`.
-        
-        path_to_img: (str)
-            Path to the file containing the preprocessed image.
-        
-        tissue: (str)
-            Name of the tissue under analysis. Can be chosen among:
-            ['bladder', 'intestine_villus', 'lung_bronchiole', 'esophagus']
-        
-        num_workers: (int)
-            Number of workers used for computation of conatct area between cells.
+    labels: (np.ndarray[int], 3D)
+        A 3D labeled image where the background has a label of 0 and cells are labeled with 
+        consecutive integers starting from 1.
+    
+    features: (List[str])
+        A list of features to compute. Can be chosen among:
+        ['area', 'volume', 'principal_axis_and_elongation', 'neighbors', 'contact_area'].
+    
+    output_directory: (str)
+        Path to the directory in which statistics will be saved.
+        In particular, the dataframe is saved in the subdir `cell_stats`,
+        while cached values of the statistics are saved in `cell_stats/cached_stats`.
+    
+    path_to_img: (str)
+        Path to the file containing the preprocessed image.
+    
+    tissue: (str)
+        Name of the tissue under analysis. Available predefined tissues are:
+        ['bladder', 'intestine_villus', 'lung_bronchiole', 'esophagus', 'embryo', 'lung']
+
+    tissue_type: (str)
+        The type of the tissue under analysis. In case `tissue` is not among the predefined
+        ones, `tissue_type` must be specified by the user. Otherwise, the tissue types associated 
+        to available tissues are:
+        ['stratified_transitional', 'simple_columnar', 'simple_cuboidal', 'stratified_squamous', 
+        'Undefined', 'pseudostratified']
+
+    filtering: (List[Literal["cut_cells", "touching_bg"]])
+        A list of metods to filter out cells which are not wanted for statistics collection.
+        In particular, the options "cut_cells" and "touching_bg" are respectively associated
+        to the functions `get_labels_touching_edges` and `get_labels_touching_background` from
+        `LabelPreprocessing.py`.
+
+    voxel_size: (Iterable[float])
+        The voxel size of the input labeled image.
+
+    slicing_dim: (Literal[0, 1, 2])
+        The axis along which 2D slices are taken in the case of 2D statistics collection from 
+        canonical axes.
+
+    num_2D_slices: (int)
+        The number of 2D slices to extract statistics from.
+    
+    size_2D_slices: (int)
+        The number of pixels of the 2D slices used to extract statistics
+    
+    num_workers: (int)
+        Number of workers used for computation of conatct area between cells.
 
 
     Example:
@@ -78,6 +104,7 @@ class StatsCollector:
             tissue_type: str,
             filtering: List[Literal["cut_cells", "no_filtering", "touching_bg"]],
             voxel_size: Iterable[float],
+            slicing_dim: Literal[0, 1, 2],
             num_2D_slices: int,
             size_2D_slices: int,
             num_workers: int
@@ -128,7 +155,10 @@ class StatsCollector:
         self.voxel_size = voxel_size
         self.num_2D_slices = num_2D_slices
         self.size_2D_slices = size_2D_slices
-        self.slicing_dim = _tissues_to_slicing_dims[tissue]
+        if isinstance(slicing_dim, int):
+            self.slicing_dim = slicing_dim
+        else:
+            self.slicing_dim = _tissues_to_slicing_dims[tissue]
         if filtering:
             self.filtering = filtering
         else:

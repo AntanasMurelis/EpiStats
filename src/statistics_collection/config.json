@@ -4,6 +4,7 @@
     "tissue": "tissue_name",
     "tissue_type": "tissue_type",
     "filtering": ["cut_cells", "touching_bg"],
+    "slicing_dim": 0, 
     "erosion_iters": 6,
     "dilation_iters": 8,
     "smoothing_iters": 10,
