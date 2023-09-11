@@ -56,7 +56,7 @@ Check the notebook `src/notebooks/plot_tutorial.ipynb`, a tutorial showing how t
 
 ## ADDITIONAL NOTES: 
 #### 1. Output format of statistics collection on cluster
-The statistics collection pipeline automatically generates output directories with the follwing format:
+The statistics collection pipeline automatically generates output directories with the following format:
 
 ![Screenshot 2023-06-13 230257](https://github.com/AntanasMurelis/EpiStats/assets/74301866/36be0a26-b402-4982-b0d5-35c47315d5a4)
 
