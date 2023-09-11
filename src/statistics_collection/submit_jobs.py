@@ -99,7 +99,7 @@ filtering_methods = [
     ["choose among 'cut_cells' and/or 'touching_bg', or empty list []"],
     ["choose among 'cut_cells' and/or 'touching_bg', or empty list []"]]
 # or also filtering_methods = [None, None, None] if `tissues` are among the predefined ones
-slicing_dims = [0, 0, 0] # int among [0, 1, 2] -> cartesian axes [x, y, z]
+slicing_dims = [0, 0, 0] # integer among [0, 1, 2] -> cartesian axes [x, y, z]
 # or also slicing_dims = [None, None, None] if `tissues` are among the predefined ones
 voxel_sizes = [[1, 1, 1], [1, 1, 1], [1, 1, 1]]
 input_paths = [
