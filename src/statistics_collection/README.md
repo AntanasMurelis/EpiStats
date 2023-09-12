@@ -77,16 +77,15 @@ The statistics collection pipeline automatically generates output directories wi
 - The `processed_label.tif` file stores the post-processed labeled 3D image. 
 
 #### 2. Set proper time duration for the job
-If you want collect 2D statistics (area, neighbors) for 2D slices along the apical-basal axis of each cell, be aware that the computation may require some time. Indeed, the algorithm has `O(n^2 * num_slices_per_cell)` time complexity, where `n` is the number of cells in the sample, and there are some functions that are not fully optimized due time shortage.
-
+If you want to compute contact area between cells and 2D statistics (area, neighbors) along the apical-basal axis of each cell, be aware that the computation may require some time. Indeed, both algorithms have `O(n^2)` time complexity.
 I will provide here some examples as a reference for possible time duration of statistics collection runs (50 slices along apical-basal axes):
 
-- 50 cells --> ~1/2 hrs
-- 150 cells --> ~8/10 hrs
-- 300 cells --> ~1.5/2 days
-- 500 cells --> ~4/5 days
+- 50 cells --> ~15 mins
+- 150 cells --> ~30 mins
+- 300 cells --> ~2 hrs
+- 500 cells --> ~3/4 hrs
 
-If you are dealing with a large sample you can:
+If you are dealing with a very large sample you can:
 1. Set a longer reserved time for your jobs in `submit_jobs.py`:
    
 ![check_path_2](https://github.com/AntanasMurelis/EpiStats/blob/main/images/info_run_collection_6.png)
