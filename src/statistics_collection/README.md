@@ -68,7 +68,7 @@ Check the notebook `src/notebooks/plot_tutorial.ipynb`, a tutorial showing how t
 #### 1. Output format of statistics collection on cluster
 The statistics collection pipeline automatically generates output directories with the following format:
 
-![Screenshot 2023-06-13 230257](https://github.com/AntanasMurelis/EpiStats/assets/74301866/36be0a26-b402-4982-b0d5-35c47315d5a4)
+![statistics_collections_output_folder](https://github.com/AntanasMurelis/EpiStats/blob/main/images/statistics_collections_output_folder_structure.png)
 
 - The name of the parent directory is taken from the file name of the input image and the letters `s`, `e`, `d` specify, respectively, the number of smoothing, erosion and dilation iterations performed.
 - The subdirectory `cell_meshes` contains the mesh files of all the cells in the sample. 
