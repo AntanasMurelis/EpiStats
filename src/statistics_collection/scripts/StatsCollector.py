@@ -138,7 +138,7 @@ class StatsCollector:
         _tissues_to_slicing_dims = dict(zip(_avail_tissues, _avail_slicing_dims))
         _tissues_to_filtering = dict(zip(
             _avail_tissues, 
-            [["cut_cells"], ["cut_cells"], ["cut_cells"], ["cut_cells"], ["no_filtering"], ["touching_bg"]]
+            [["cut_cells"], ["cut_cells"], ["cut_cells"], ["cut_cells"], ["no_filtering"], ["cut_cells", "touching_bg"]]
         ))
         
         # Attributes related to input samples
