@@ -30,7 +30,7 @@ def main(
         features_to_rename: List[Tuple[str, str]],
         stats_from_principal_axes: Optional[bool] = True,
         remove_na: Optional[bool] = True,
-        find_outliers: Optional[bool] = True,
+        detect_outliers: Optional[bool] = True,
         num_2D_neighbors_threshold: Optional[int] = 3, 
         num_principal_comps: Optional[int] = 2,
 ) -> None:
@@ -87,8 +87,8 @@ def main(
     )
     
     # Outlier detection (if necessary)
-    if find_outliers:
-        stats_df = sa.detect_outliers(df=stats_df, quantile_level=0.025)
+    if detect_outliers:
+        stats_df = sa.find_outliers(df=stats_df)
 
     # Extract dataframe with only ids and numerical features
     # NOTE: The function also remove NA's
