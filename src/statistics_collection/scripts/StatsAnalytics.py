@@ -4,6 +4,7 @@ import ast
 import re
 import warnings
 from tqdm import tqdm
+from statsmodels.robust import mad 
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from collections import defaultdict
@@ -170,8 +171,9 @@ def rename_features(
 def _detect_volume_outliers(
     df: pd.DataFrame,
     quantile_level: Optional[float] = 0.025,
+    z_score_threshold: Optional[float] = 3,
     lower_bound: Optional[float] = None,
-    upper_bound: Optional[float] = None
+    upper_bound: Optional[float] = None,
 ) -> pd.DataFrame:
     '''
     Detect cells in the dataset with outlying volume.
@@ -188,11 +190,15 @@ def _detect_volume_outliers(
         Cells below this quantile_level are marked as small, cells
         above are marked as large.
 
+    z_score_threshold: (Optional[float])
+        The threshold for z-score computed for the volume over which a cell is 
+        considered an outlier. 
+
     lower_bound: (Optional[float])
-        Cells below this bound are marked as small cells.
+        A user-defined volume lower bound below which are marked as small cells.
 
     upper_bound: (Optional[float])
-        Cells above this bound are marked as large cells.
+        A user-defined volume lower bound below which are marked as large cells.
 
     Returns:
     --------
@@ -202,6 +208,8 @@ def _detect_volume_outliers(
         cells with outlying values of volume.
 
     '''
+
+    warnings.warn("This function is deprecated. Use the _find_feature_outliers function instead.", DeprecationWarning)
 
     tissues = df['tissue'].unique()
     df['is_small_cell'] = np.zeros(len(df), dtype=bool)
@@ -235,7 +243,6 @@ of which:
         )
 
     return df
-        
 #------------------------------------------------------------------------------------------------------------
 
 
@@ -266,6 +273,8 @@ def _detect_num_neighbors_outliers(
         boolean columns `is_small_cell` and `is_large_cell` that mark
         cells with outlying values of volume.
     """
+
+    warnings.warn("This function is deprecated. Use the _find_feature_outliers function instead.", DeprecationWarning)
 
     tissues = df['tissue'].unique()
     df['unfrequent_num_neighbors'] = np.zeros(len(df), dtype=bool)
@@ -334,6 +343,8 @@ def detect_outliers(
 
     '''
 
+    warnings.warn("This function is deprecated. Use the find_outliers function instead.", DeprecationWarning)
+
     avail_methods = ("volume", "num_neighbors")
     for method in methods:
         assert method in avail_methods, f"Selected method {method} is not available. Chose among {avail_methods}."
@@ -377,7 +388,146 @@ def detect_outliers(
         out_df = df.copy()
         out_df['is_outlier'] = is_outlier
         return out_df
+#------------------------------------------------------------------------------------------------------------
 
+
+
+#------------------------------------------------------------------------------------------------------------
+def _find_feature_outliers(
+    df: pd.DataFrame,
+    feature: str, 
+    is_continuous: Optional[bool] = True,
+    z_score_threshold: Optional[float] = 3
+) -> pd.DataFrame:
+    '''
+    Detect cells in the dataset that are outlying with respect to a given feature.
+    The outlyingness is determined by computing the Modified Z-Score, i.e. the Z-Score 
+    computed using the median and the median absolute deviation of data.
+
+    Parameters:
+    -----------
+    df: (pd.DataFrame)
+        The cell statistics dataframe.
+    
+    is_continuous: (Optional[bool])
+        `True` if the considered feature is continuous. Default is `True`.
+
+    feature: (str)
+        The name of the feature for which we compute the outliers.
+
+    z_score_threshold: (Optional[float])
+        The threshold for the Z-Score computed for the selected feature over which a 
+        cell is considered an outlier. 
+
+    Returns:
+    --------
+    out_df: (pd.Dataframe)
+        A copy of the input dataframe with an additional boolean columns named `outlying_{feature}`
+    '''
+
+    assert feature in df.columns, f"The selected feature {feature} in not among the dataframe columns."
+
+    def compute_mod_z_score(x):
+        return (x - np.median(x)) / mad(x)
+    
+    out_df = df.copy()
+
+    grouped_df = out_df.groupby(["tissue"])[[feature]].transform(compute_mod_z_score)
+    out_df[f"outlying_{feature}"] = abs(grouped_df[feature]) > z_score_threshold
+
+    if is_continuous:
+        # Print the number of outliers found
+        num_outliers_lst = out_df.groupby(["tissue"])[f"outlying_{feature}"].sum()
+        for num_outliers, tissue in zip(num_outliers_lst.values, num_outliers_lst.index.values):
+            print(
+                f"Found a total of {num_outliers} {feature.capitalize()} outliers in the {tissue} sample."
+            )
+    else:
+        # Print which and how many outliers were found
+        num_outliers_lst = out_df.groupby(["tissue"])[f"outlying_{feature}"].sum()
+        with_outliers = num_outliers_lst[num_outliers_lst.values > 0]
+        no_outliers_tissues = num_outliers_lst.index[num_outliers_lst.values == 0].values
+        which_outliers_lst = out_df[out_df[f"outlying_{feature}"]].groupby(["tissue"])[feature].unique()
+        with_outliers_tissues = which_outliers_lst.index.values
+        for num_outliers, tissue, which_outliers in zip(with_outliers, with_outliers_tissues, which_outliers_lst):
+            print(
+                f"""\
+Found a total of {num_outliers} {feature} outliers in the {tissue} sample.
+The unique outlying values are {sorted(which_outliers)}.
+                """
+            )
+        if no_outliers_tissues:
+            for no_outliers_tissue in no_outliers_tissues:
+                print(f"NO outliers found in the {no_outliers_tissue} tissue.")
+
+    return out_df
+#------------------------------------------------------------------------------------------------------------
+
+
+
+#------------------------------------------------------------------------------------------------------------
+def find_outliers(
+    df: pd.DataFrame,
+    features: Optional[Iterable[Literal['volume', 'num_neighbors']]] = ('volume', 'num_neighbors'),
+    are_continuous: Optional[Iterable[bool]] = (True, False), 
+    z_score_thresholds: Optional[Iterable[float]] = (3, 3),
+) -> Union[pd.DataFrame, None]:
+    '''
+    Apply the outliers detection functions decided by the user.
+    The default is volume outliers search.
+
+    Parameters:
+    -----------
+        df: (pd.DataFrame)
+            The cell statistics dataframe to apply outliers detection to.
+    
+        features: (Optional[List[Literal['volume', 'num_neighbors']]], default=('volume', 'num_neighbors'))
+            An iterable storing the names of features for outlier detection.
+
+        is_continuous: (Optional[bool])
+            An iterable whose values indicate if the considered feature is continuous.
+
+        z_score_threshold: (Optional[float])
+            An iterable storing the thresholds for the Z-Score computed for the selected features.
+    
+    Returns:
+    --------
+        out_df: (pd.Dataframe)
+            A copy of the input dataframe with columns identifying the outliers.
+
+    '''
+
+    out_df = df.copy()
+
+    #drop NAs
+    len_before = len(out_df)
+    out_df = out_df.dropna()
+    len_after = len(out_df)
+    print(f'Dropped {len_before - len_after} records containing NAs.')
+
+    is_outlier = np.zeros(len(out_df))
+    
+    for i in range(len(features)):
+        print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+        print(f"Detecting {features[i].upper()} OUTLIERS")
+        out_df = _find_feature_outliers(
+            df=out_df, 
+            feature=features[i], 
+            is_continuous=are_continuous[i],
+            z_score_threshold=z_score_thresholds[i]
+        )
+        is_outlier = np.logical_or(is_outlier, out_df[f"outlying_{features[i]}"])
+        print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+
+    out_df["is_outlier"] = is_outlier
+    num_outliers_lst = out_df.groupby(["tissue"])["is_outlier"].sum()
+    print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+    print("TOTAL OUTLIERS")
+    for num_outliers, tissue in zip(num_outliers_lst.values, num_outliers_lst.index.values):
+        print(
+            f"Found a total of {num_outliers} outliers in the {tissue} sample."
+        )
+    return out_df
 #------------------------------------------------------------------------------------------------------------
 
 

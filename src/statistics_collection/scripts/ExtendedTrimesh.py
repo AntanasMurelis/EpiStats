@@ -1,4 +1,4 @@
-from pykdtree.kdtree import KDTree
+from scipy.spatial import KDTree
 import numpy as np
 import trimesh
 from typing import List
