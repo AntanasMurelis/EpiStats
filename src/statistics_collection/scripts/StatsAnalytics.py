@@ -456,7 +456,7 @@ Found a total of {num_outliers} {feature} outliers in the {tissue} sample.
 The unique outlying values are {sorted(which_outliers)}.
                 """
             )
-        if no_outliers_tissues:
+        if len(no_outliers_tissues) > 1:
             for no_outliers_tissue in no_outliers_tissues:
                 print(f"NO outliers found in the {no_outliers_tissue} tissue.")
 
