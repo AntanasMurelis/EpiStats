@@ -505,7 +505,8 @@ def find_outliers(
     len_after = len(out_df)
     print(f'Dropped {len_before - len_after} records containing NAs.')
 
-    is_outlier = np.zeros(len(out_df))
+    # Mark as outliers cells with less than 3 neighbors, since it is not physically possible
+    is_outlier = (out_df["num_neighbors"] < 3).values
     
     for i in range(len(features)):
         print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
@@ -523,10 +524,9 @@ def find_outliers(
     num_outliers_lst = out_df.groupby(["tissue"])["is_outlier"].sum()
     print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
     print("TOTAL OUTLIERS")
+    print(f"Found a total of {np.sum(is_outlier)} outliers. In particular:")
     for num_outliers, tissue in zip(num_outliers_lst.values, num_outliers_lst.index.values):
-        print(
-            f"Found a total of {num_outliers} outliers in the {tissue} sample."
-        )
+        print(f"- {num_outliers} outliers are from the {tissue} sample.")
     return out_df
 #------------------------------------------------------------------------------------------------------------
 
@@ -535,6 +535,7 @@ def find_outliers(
 #------------------------------------------------------------------------------------------------------------
 def _exclude_outliers(
     df: pd.DataFrame,
+    remove_neigbors: Optional[bool] = True
 ) -> pd.DataFrame:
     '''
     Return a copy of the input dataframe without the records marked as outliers.
@@ -547,13 +548,15 @@ def _exclude_outliers(
             The input dataframe. It must have an `is_outlier` boolean column,
             which is `True` if the correspondent record should be removed.
 
+        remove_neighbors: (Optional[bool] = True)
+
     Returns:
     --------
         out_df: (pd.DataFrame)
             The input dataframe without outliers.  
     '''
 
-    if 'neighbors' in df.columns:
+    if remove_neigbors:
         # Remove outlying indexes from neighbors lists
         tissues = df['tissue'].unique()
         for tissue in tissues:
@@ -570,18 +573,18 @@ def _exclude_outliers(
                     # for idx in rm_idxs:
                     #     del tissue_df.loc[idx, 'neighbors'][idx]
                     tissue_df.at[idx, 'num_neighbors'] -= np.sum(mask)
-                    # 2D neighbors
-                    new_neighs, new_num_neighs = [], []
-                    for neighs, num_neighs in zip(row['neighbors_2D'], row['num_neighbors_2D']):
-                        mask = np.isin(np.asarray(neighs), out_idxs)
-                        # rm_idxs = np.where(mask)[0]
-                        new_neighs.append(list(np.asarray(neighs)[~mask]))
-                        # for idx in rm_idxs:
-                        #     del neighs[idx]
-                        # new_neighs.append(neighs)
-                        new_num_neighs.append(num_neighs - np.sum(mask))
-                    tissue_df.at[idx, 'neighbors_2D'] = new_neighs
-                    tissue_df.at[idx, 'num_neighbors_2D'] = new_num_neighs
+                    # # 2D neighbors
+                    # new_neighs, new_num_neighs = [], []
+                    # for neighs, num_neighs in zip(row['neighbors_2D'], row['num_neighbors_2D']):
+                    #     mask = np.isin(np.asarray(neighs), out_idxs)
+                    #     # rm_idxs = np.where(mask)[0]
+                    #     new_neighs.append(list(np.asarray(neighs)[~mask]))
+                    #     # for idx in rm_idxs:
+                    #     #     del neighs[idx]
+                    #     # new_neighs.append(neighs)
+                    #     new_num_neighs.append(num_neighs - np.sum(mask))
+                    # tissue_df.at[idx, 'neighbors_2D'] = new_neighs
+                    # tissue_df.at[idx, 'num_neighbors_2D'] = new_num_neighs
             
             df[df['tissue'] == tissue] = tissue_df
 
@@ -627,7 +630,7 @@ def extract_numerical(
 
     '''
     #keep only id features plus numerical ones
-    id_features = ['cell_ID', 'tissue', 'tissue_type', 'exclude_cell', 'is_outlier']
+    id_features = ['cell_ID', 'tissue', 'tissue_type', 'exclude_cell', 'is_outlier', 'neighbors']
     keep_features = id_features + numeric_features
     drop_features = [feat for feat in df.columns if feat not in keep_features]
 
