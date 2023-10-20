@@ -50,7 +50,8 @@ def corr_matrix_plot(
     remove_outliers: Optional[bool] = True,
     color_map: Optional[Union[ListedColormap, str]] = 'viridis',  
     save_dir: Optional[str] = None, 
-    show: Optional[bool] = False
+    show: Optional[bool] = False,
+    save_format: Optional[str] = 'png'
 ) -> None:
     '''
     Plot the correlation matrix of the numerical features of the standardized dataframe.
@@ -77,6 +78,9 @@ def corr_matrix_plot(
         
         show: (Optional[bool], default=False)
             If `True` show the plot when calling the function.
+
+        save_format: (Optional[str], default='png')
+            The format in which the resulting figure is saved.
     '''
 
     if standardize_data:
@@ -119,8 +123,8 @@ def corr_matrix_plot(
     if save_dir:
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
-        save_name = f"correlation_matrix_heatmap.jpg"
-        plt.savefig(os.path.join(save_dir, save_name), bbox_inches='tight', dpi=150) 
+        save_name = f"correlation_matrix_heatmap.{save_format}"
+        plt.savefig(os.path.join(save_dir, save_name), format=save_format) 
 
     if show:
         plt.show()
@@ -138,7 +142,8 @@ def pca_plots(
     remove_outliers: Optional[bool] = True,
     color_map: Optional[Union[ListedColormap, str]] = 'viridis', 
     save_dir: Optional[str] = None, 
-    show: Optional[bool] = False
+    show: Optional[bool] = False,
+    save_format: Optional[str] = 'png'
 ) -> None:
     '''
     Plot PCA scatterplot and loadings barplots. 
@@ -165,6 +170,9 @@ def pca_plots(
         
         show: (Optional[bool], default=False)
             If `True` show the plot when calling the function.
+
+        save_format: (Optional[str], default='png')
+            The format in which the resulting figure is saved.
     '''
 
     if save_dir:
@@ -206,8 +214,8 @@ def pca_plots(
     ax2.tick_params(axis='x', labelrotation=75, labelsize=18)
 
     if save_dir:
-        save_name = f"pca_loadings_barplots.jpg"
-        plt.savefig(os.path.join(save_dir, save_name), bbox_inches='tight', dpi=150) 
+        save_name = f"pca_loadings_barplots.{save_format}"
+        plt.savefig(os.path.join(save_dir, save_name), format=save_format) 
 
     if show:
         plt.show()
@@ -252,8 +260,8 @@ def pca_plots(
     )
 
     if save_dir:
-        save_name = f"pca_scatterplot.jpg"
-        plt.savefig(os.path.join(save_dir, save_name), bbox_inches='tight', dpi=150) 
+        save_name = f"pca_scatterplot.{save_format}"
+        plt.savefig(os.path.join(save_dir, save_name), format=save_format) 
 
     if show:
         plt.show()
@@ -273,7 +281,8 @@ def features_grid_kdplots(
     remove_outliers: Optional[bool] = True, 
     color_map: Optional[Union[ListedColormap, str]] = 'viridis', 
     save_dir: Optional[str] = None, 
-    show: Optional[bool] = False 
+    show: Optional[bool] = False,
+    save_format: Optional[str] = 'png'
 ) -> None:
     '''
     Make a grid of kernel density estimation plots of the chosen features. 
@@ -305,6 +314,9 @@ def features_grid_kdplots(
         
         show: (Optional[bool], default=False)
             If `True` show the plot when calling the function.
+        
+        save_format: (Optional[str], default='png')
+            The format in which the resulting figure is saved.
     '''
 
     if remove_outliers:
@@ -419,8 +431,8 @@ def features_grid_kdplots(
     if save_dir:
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
-        save_name = f"grid_kdeplots.jpg"
-        plt.savefig(os.path.join(save_dir, save_name), bbox_inches='tight', dpi=150) 
+        save_name = f"grid_kdeplots.{save_format}"
+        plt.savefig(os.path.join(save_dir, save_name), format=save_format) 
 
     # Show the plot
     if show:
@@ -439,7 +451,8 @@ def num_neighbors_barplots(
     remove_outliers: Optional[bool] = True,
     color_map: Optional[Union[ListedColormap, str]] = 'viridis',
     save_dir: Optional[str] = None, 
-    show: Optional[bool] = False 
+    show: Optional[bool] = False ,
+    save_format: Optional[str] = 'png'
 ) -> None:
     '''
     Make a barplot of the number of neighbors for the different samples,
@@ -460,6 +473,9 @@ def num_neighbors_barplots(
         
         show: (Optional[bool], default=False)
             If `True` show the plot when calling the function.
+        
+        save_format: (Optional[str], default='png')
+            The format in which the resulting figure is saved.
     '''
     
     if remove_outliers:
@@ -549,8 +565,8 @@ def num_neighbors_barplots(
     if save_dir:
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
-        save_name = f"num_neighbors_barplot.jpg"
-        plt.savefig(os.path.join(save_dir, save_name), bbox_inches='tight', dpi=150) 
+        save_name = f"num_neighbors_barplot.{save_format}"
+        plt.savefig(os.path.join(save_dir, save_name), format=save_format) 
 
     # Show the plot
     if show:
@@ -570,7 +586,8 @@ def lewis_law_plots(
     remove_outliers: Optional[bool] = True,
     color_map: Optional[Union[ListedColormap, str]] = 'viridis',
     save_dir: Optional[str] = None,     
-    show: Optional[bool] = False 
+    show: Optional[bool] = False,
+    save_format: Optional[str] = 'png'
 ) -> None:
     '''
     Make a plot of to empirically check the 3D Lewis Law across different tissues.
@@ -597,6 +614,9 @@ def lewis_law_plots(
         
         show: (Optional[bool], default=False)
             If `True` show the plot when calling the function.
+        
+        save_format: (Optional[str], default='png')
+            The format in which the resulting figure is saved.
     '''
 
     if remove_outliers:
@@ -735,8 +755,8 @@ def lewis_law_plots(
     if save_dir:
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
-        save_name = f"lewis_law_{feature}_plots.jpg"
-        plt.savefig(os.path.join(save_dir, save_name), bbox_inches='tight', dpi=150) 
+        save_name = f"lewis_law_{feature}_plots.{save_format}"
+        plt.savefig(os.path.join(save_dir, save_name), format=save_format) 
 
     # Show the plot
     if show:
@@ -756,7 +776,8 @@ def lewis_law_2D_plots(
     remove_outliers: Optional[bool] = True,
     color_map: Optional[Union[ListedColormap, str]] = 'viridis',
     save_dir: Optional[str] = None,     
-    show: Optional[bool] = False 
+    show: Optional[bool] = False,
+    save_format: Optional[str] = 'png'
 ) -> None:
     '''
     Make a plot of to empirically check the 2D Lewis Law across different slices of tissues.
@@ -786,6 +807,9 @@ def lewis_law_2D_plots(
         
         show: (Optional[bool], default=False)
             If `True` show the plot when calling the function.
+
+        save_format: (Optional[str], default='png')
+            The format in which the resulting figure is saved.
     '''
 
     if remove_outliers:
@@ -925,8 +949,8 @@ def lewis_law_2D_plots(
     if save_dir:
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
-        save_name = f"lewis_law_2D_{version}_plots.jpg"
-        plt.savefig(os.path.join(save_dir, save_name), bbox_inches='tight', dpi=150) 
+        save_name = f"lewis_law_2D_{version}_plots.{save_format}"
+        plt.savefig(os.path.join(save_dir, save_name), format=save_format) 
 
     # Show the plot
     if show:
@@ -945,7 +969,8 @@ def aboav_wearie_2D_plots(
     remove_outliers: Optional[bool] = True,
     color_map: Optional[Union[ListedColormap, str]] = 'viridis',
     save_dir: Optional[str] = None,     
-    show: Optional[bool] = False 
+    show: Optional[bool] = False,
+    save_format: Optional[str] = 'png'
 ) -> None:
     '''
     Make a plot of to empirically check the 2D Lewis Law across different slices of tissues.
@@ -1069,8 +1094,8 @@ def aboav_wearie_2D_plots(
     if save_dir:
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
-        save_name = f"aboav_law_2D_{version}_plots.jpg"
-        plt.savefig(os.path.join(save_dir, save_name), bbox_inches='tight', dpi=150) 
+        save_name = f"aboav_law_2D_{version}_plots.{save_format}"
+        plt.savefig(os.path.join(save_dir, save_name), format=save_format) 
 
     # Show the plot
     if show:
@@ -1089,7 +1114,8 @@ def area_variability_plots(
     remove_outliers: Optional[bool] = True,
     color_map: Optional[Union[ListedColormap, str]] = 'viridis',
     save_dir: Optional[str] = None,     
-    show: Optional[bool] = False 
+    show: Optional[bool] = False,
+    save_format: Optional[str] = 'png'
 ) -> None:
     '''
     Make a plot of to empirically check the 2D Lewis Law across different slices of tissues.
@@ -1115,6 +1141,9 @@ def area_variability_plots(
         
         show: (Optional[bool], default=False)
             If `True` show the plot when calling the function.
+
+        save_format: (Optional[str], default='png')
+            The format in which the resulting figure is saved.
     '''
 
     if remove_outliers:
@@ -1175,8 +1204,8 @@ def area_variability_plots(
     if save_dir:
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
-        save_name = f"area_variability_plots.jpg"
-        plt.savefig(os.path.join(save_dir, save_name), bbox_inches='tight', dpi=150) 
+        save_name = f"area_variability_plots.{save_format}"
+        plt.savefig(os.path.join(save_dir, save_name), format=save_format) 
 
     # Show the plot
     if show:
@@ -1196,7 +1225,8 @@ def violin_plots(
     remove_outliers: Optional[bool] = True,
     color_map: Optional[Union[ListedColormap, str]] = 'viridis',
     save_dir: Optional[str] = None, 
-    show: Optional[bool] = False 
+    show: Optional[bool] = False, 
+    save_format: Optional[str] = 'png'
 ) -> None:
     """
     Generate violin plots to .
@@ -1226,6 +1256,9 @@ def violin_plots(
         
         show: (Optional[bool], default=False)
             If `True` show the plot when calling the function.
+
+        save_format: (Optional[str], default='png')
+            The format in which the resulting figure is saved.
     """
 
     if remove_outliers:
@@ -1264,8 +1297,8 @@ def violin_plots(
     if save_dir:
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
-        save_name = f"{tissue}_violin_plot.jpg"
-        plt.savefig(os.path.join(save_dir, save_name), bbox_inches='tight', dpi=150) 
+        save_name = f"{tissue}_violin_plot.{save_format}"
+        plt.savefig(os.path.join(save_dir, save_name), format=save_format) 
 
     # Show the plot
     if show:
