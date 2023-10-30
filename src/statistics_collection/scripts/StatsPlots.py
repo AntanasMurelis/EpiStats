@@ -771,8 +771,8 @@ def lewis_law_plots(
 #------------------------------------------------------------------------------------------------------------
 def lewis_law_2D_plots(
     df: pd.DataFrame, 
-    fit_degrees: Optional[Iterable[int]] = [1,2],
-    version: Literal['standard', 'principal'] = 'standard',
+    fit_degrees: Optional[Iterable[int]] = None,
+    version: Literal['standard', 'principal'] = 'principal',
     remove_outliers: Optional[bool] = True,
     color_map: Optional[Union[ListedColormap, str]] = 'viridis',
     save_dir: Optional[str] = None,     
@@ -780,14 +780,14 @@ def lewis_law_2D_plots(
     save_format: Optional[str] = 'png'
 ) -> None:
     '''
-    Make a plot of to empirically check the 2D Lewis Law across different slices of tissues.
+    Make a plot to empirically check the 2D Lewis Law across different slices of tissues.
 
     Parameters:
     -----------
         df: (pd.DataFrame)
             The input dataframe.
         
-        fit_degrees: (Optional[Iterable[int]], default=[1,2])
+        fit_degrees: (Optional[Iterable[int]], default=None)
             The degree of the polynomial fitted on the data in the plots.
             If `None`, no polynomial fitting is done.
 

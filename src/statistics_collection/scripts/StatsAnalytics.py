@@ -779,7 +779,7 @@ def _get_lewis_law_2D_stats(
         The threshold under which a cell is excluded from computation.
     
     principal_axis (Optional[bool], default=True)
-        If True compute the lewis law statistics for the 2D statistics 
+        If True compute the Lewis law statistics for the 2D statistics 
         collected along cells' principal_axes.
 
     freq_threshold: (Optional[float] = 0.05)
